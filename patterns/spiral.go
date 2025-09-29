@@ -7,182 +7,310 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
-// DrawSpiral creates organic, fibonacci-harmonious multi-armed spirals with 3D depth and perspective
+// DrawSpiral creates organic procedural flow patterns with counter-rotating streams
 func DrawSpiral(screen tcell.Screen, width, height int, color tcell.Color, char rune, rng *rand.Rand, peak float64) {
 	centerX, centerY := width/2, height/2
 	basePhase := GetBasePhase()
 	maxRadius := float64(Min(width, height)) / 2.5
 
-	goldenAngle := math.Pi * (3 - math.Sqrt(5))
-	goldenRatio := (1 + math.Sqrt(5)) / 2
-
-	// 3D depth layers - create multiple Z planes
+	// 3D depth layers for organic flows
 	numDepthLayers := 3 + int(peak*2)
 	if numDepthLayers > 5 {
 		numDepthLayers = 5
 	}
 
-	// Process each depth layer from back to front for proper 3D layering
+	// Process each depth layer from back to front
 	for depthLayer := numDepthLayers - 1; depthLayer >= 0; depthLayer-- {
 		depthRatio := float64(depthLayer) / float64(numDepthLayers-1)
-
-		// 3D perspective effects
-		perspectiveScale := 0.5 + depthRatio*0.7 // Back layers smaller
+		perspectiveScale := 0.5 + depthRatio*0.7
 		depthMaxRadius := maxRadius * perspectiveScale
 
-		// 3D Z-axis rotation and movement - gentler than starburst
-		zRotation := basePhase * (0.1 + depthRatio*0.2) * (1 - 2*float64(depthLayer%2))
-		zBobbing := math.Sin(basePhase*1.2+float64(depthLayer)*goldenAngle) * 0.08
+		// Organic phase with depth influence
+		depthPhase := basePhase * (0.4 + depthRatio*0.5)
 
-		// Depth-based phase offset for parallax
-		depthPhase := basePhase * (0.6 + depthRatio*0.4)
-
-		// 3D gentle number of spiral arms per depth layer
-		baseArms := 2 + depthLayer%2
-		dynamicArms := int(peak * (1.5 + float64(depthLayer)*0.3))
-		numArms := baseArms + dynamicArms
-		if numArms > 3+depthLayer {
-			numArms = 3 + depthLayer
-		}
-
-		// 3D character sets based on depth - gentler progression
+		// 3D character sets based on depth - very subtle
 		var chars []rune
-		if depthLayer < 2 { // Foreground layers - slightly more visible
-			chars = []rune{'◦', '○', '●', '⋅', '∘', '·', '˙', '∙', '°'}
-		} else if depthLayer < 4 { // Mid layers - very subtle
-			chars = []rune{'⋅', '∘', '◦', '·', '˙', '∙', '°'}
-		} else { // Background layers - barely visible
-			chars = []rune{'⋅', '·', '˙', '∘'}
+		if depthLayer < 2 {
+			chars = []rune{'◦', '○', '⋅', '∘', '·', '˙', '∙'}
+		} else if depthLayer < 4 {
+			chars = []rune{'⋅', '∘', '◦', '·', '˙'}
+		} else {
+			chars = []rune{'⋅', '·', '˙'}
 		}
 
-		for arm := 0; arm < numArms; arm++ {
-			// 3D arm phase with depth influence
-			armPhase := float64(arm)*2*math.Pi/float64(numArms) +
-				float64(depthLayer)*goldenAngle*0.2
+		// PROCEDURAL ORGANIC FLOWS instead of geometric spirals
+		drawOrganicFlows(screen, centerX, centerY, depthMaxRadius, depthPhase, depthLayer,
+			perspectiveScale, peak, chars, width, height)
 
-			// 3D very slow, gentle rotation with depth variation
-			rotationSpeed := (0.1 * (1 + float64(arm%2)*0.05)) * (0.8 + depthRatio*0.4)
-			armRotation := depthPhase * rotationSpeed * goldenRatio
+		// COUNTER-ROTATING STREAMS
+		drawCounterStreams(screen, centerX, centerY, depthMaxRadius, depthPhase, depthLayer,
+			perspectiveScale, peak, chars, width, height)
 
-			// 3D very gentle arm characteristics scaled by depth
-			armAmplitude := peak * (0.3 + float64(arm)*0.05) * perspectiveScale
-			armFrequency := (0.2 + float64(arm)*0.02 + peak*0.05) * (1 + depthRatio*0.1)
+		// ORGANIC GROWTH TENDRILS
+		drawGrowthTendrils(screen, centerX, centerY, depthMaxRadius, depthPhase, depthLayer,
+			perspectiveScale, peak, chars, width, height)
+	}
+}
 
-			// 3D minimal layers for smooth, laid-back feel
-			numLayers := 1 + int(peak*1.2*(0.7+depthRatio*0.5))
-			if numLayers > 2 {
-				numLayers = 2
+// drawOrganicFlows creates flowing organic patterns using procedural generation
+func drawOrganicFlows(screen tcell.Screen, centerX, centerY int, maxRadius, phase float64,
+	depthLayer int, scale, peak float64, chars []rune, width, height int) {
+
+	goldenRatio := (1 + math.Sqrt(5)) / 2
+	goldenAngle := math.Pi * (3 - math.Sqrt(5))
+
+	// Number of organic flow streams
+	numFlows := 2 + int(peak*2)
+	if numFlows > 4 {
+		numFlows = 4
+	}
+
+	for flowIndex := 0; flowIndex < numFlows; flowIndex++ {
+		flowPersonality := float64(flowIndex)*goldenRatio + float64(depthLayer)*1.3
+
+		// Organic flow direction - some clockwise, some counter-clockwise
+		flowDirection := float64(1 - 2*(flowIndex%2))
+
+		// Procedural starting angle
+		baseAngle := flowPersonality * goldenAngle * 1.7
+
+		// Organic rotation speed
+		rotationSpeed := (0.15 + float64(flowIndex)*0.05) * flowDirection
+		currentAngle := baseAngle + phase*rotationSpeed
+
+		// Flow characteristics
+		flowAmplitude := peak * (0.2 + float64(flowIndex)*0.03) * scale
+		flowFrequency := 0.15 + float64(flowIndex)*0.02
+
+		// Generate organic flow path using procedural methods
+		stepCount := int(maxRadius / (3.0 + float64(depthLayer)*0.5))
+
+		for step := 0; step < stepCount; step++ {
+			stepRatio := float64(step) / float64(stepCount)
+			radius := stepRatio * maxRadius * (0.8 + peak*0.3)
+
+			// PROCEDURAL ORGANIC CURVATURE - not geometric
+			// Use multiple noise-like functions for natural flow
+			flowNoise1 := flowAmplitude * math.Sin(radius*flowFrequency*0.8+phase*1.2+flowPersonality)
+			flowNoise2 := flowAmplitude * 0.6 * math.Cos(radius*flowFrequency*1.3+phase*0.9+flowPersonality*0.7)
+			flowNoise3 := flowAmplitude * 0.4 * math.Sin(radius*flowFrequency*2.1+phase*1.6+flowPersonality*0.4)
+
+			// Combine for organic curvature
+			organicCurvature := flowNoise1 + flowNoise2 + flowNoise3
+
+			// Organic breathing and pulsing
+			breathe := 1 + 0.04*math.Sin(phase*1.5+flowPersonality+radius*0.03)*scale
+
+			// Natural angle deviation - not spiral-like
+			angleDeviation := organicCurvature * 0.12
+			finalAngle := currentAngle + angleDeviation
+
+			// Organic radius with natural variations
+			radiusVariation := 0.1 * math.Sin(phase*2.2+radius*0.06+flowPersonality)
+			finalRadius := (radius + radiusVariation) * breathe
+
+			// Micro-positioning for organic feel
+			microX := 0.2 * math.Sin(phase*2.8+radius*0.04) * scale
+			microY := 0.2 * math.Cos(phase*3.1+radius*0.045) * scale
+
+			x := centerX + int(finalRadius*math.Cos(finalAngle)+microX)
+			y := centerY + int(finalRadius*math.Sin(finalAngle)+microY)
+
+			if x >= 0 && x < width && y >= 0 && y < height {
+				// Organic character selection
+				charPhase := flowPersonality + radius*0.08 + organicCurvature*0.4
+				charIndex := int(math.Abs(charPhase)) % len(chars)
+				displayChar := chars[charIndex]
+
+				// Organic color
+				hue := math.Mod(flowPersonality*0.4+phase*0.06+organicCurvature*0.02, 1)
+				saturation := (0.25 + peak*0.15) * (0.4 + stepRatio*0.4) * scale
+				saturation = math.Max(0.05, math.Min(0.5, saturation))
+
+				value := (0.3 + peak*0.15) * (0.3 + stepRatio*0.5) * scale
+				value = math.Max(0.1, math.Min(0.6, value))
+
+				flowColor := HSVToRGB(hue, saturation, value)
+
+				// Organic transparency
+				if stepRatio > 0.7 || math.Abs(organicCurvature) < flowAmplitude*0.3 {
+					displayChar = '·'
+				}
+
+				screen.SetContent(x, y, displayChar, nil, tcell.StyleDefault.Foreground(flowColor))
 			}
 
-			for layer := 0; layer < numLayers; layer++ {
-				layerPhase := depthPhase * (0.5 + float64(layer)*0.15)
-				layerScale := (1.0 - float64(layer)*0.2) * perspectiveScale
+			// Organic angle progression - not geometric
+			angleStep := (0.04 + peak*0.02) * goldenAngle * 0.4 * flowDirection
+			currentAngle += angleStep + organicCurvature*0.05
+		}
+	}
+}
 
-				// 3D start from center with organic growth and depth influence
-				radius := (2.0 + float64(layer)*3) * perspectiveScale
-				angle := armPhase + armRotation + float64(layer)*0.4 + zRotation*0.5
+// drawCounterStreams creates counter-rotating organic streams
+func drawCounterStreams(screen tcell.Screen, centerX, centerY int, maxRadius, phase float64,
+	depthLayer int, scale, peak float64, chars []rune, width, height int) {
 
-				// 3D very gentle, sparse step calculation with depth scaling
-				baseStep := (1.2 + peak*0.4) * perspectiveScale
+	goldenRatio := (1 + math.Sqrt(5)) / 2
 
-				for radius < depthMaxRadius*layerScale {
-					// 3D very gentle wave functions with depth influence
-					wave1 := armAmplitude * 0.5 * math.Sin(armFrequency*angle+layerPhase*0.8+zBobbing)
-					wave2 := armAmplitude * 0.3 * math.Cos(armFrequency*1.2*angle+layerPhase*0.6+zRotation*0.3)
-					wave3 := armAmplitude * 0.2 * math.Sin(armFrequency*0.8*angle+layerPhase*1.1+zBobbing*2)
-					organicOffset := wave1 + wave2 + wave3
+	// Fewer, more subtle counter-streams
+	numStreams := 1 + int(peak*1.5)
+	if numStreams > 3 {
+		numStreams = 3
+	}
 
-					// Safety check
-					if math.IsNaN(organicOffset) || math.IsInf(organicOffset, 0) {
-						organicOffset = 0
-					}
+	for streamIndex := 0; streamIndex < numStreams; streamIndex++ {
+		streamPersonality := float64(streamIndex)*goldenRatio*2.1 + float64(depthLayer)*0.9
 
-					// 3D very gentle breathing effect with depth influence
-					breathe := 1 + 0.03*math.Sin(layerPhase*1.0+float64(arm)*goldenAngle+
-						float64(layer)*0.4+zBobbing*3)*perspectiveScale
+		// Alternating directions for organic counter-flow
+		streamDirection := float64(1 - 2*(streamIndex%2))
 
-					// 3D very subtle radius variations with depth scaling
-					microWave := 0.1 * math.Sin(layerPhase*2+radius*0.05+zRotation*0.5) * perspectiveScale
-					finalRadius := (radius + organicOffset*1.5 + microWave) * breathe
+		// Organic starting position
+		startAngle := streamPersonality * 1.3
+		rotationSpeed := 0.12 * streamDirection * (0.8 + float64(streamIndex)*0.1)
 
-					// 3D very gentle angle variations with depth influence
-					angleVariation := math.Sin(layerPhase*0.4+radius*0.02+zBobbing) * 0.03 * perspectiveScale
-					depthAngleShift := depthRatio * math.Cos(depthPhase*0.3+float64(arm)*goldenAngle) * 0.05
-					finalAngle := angle + angleVariation + depthAngleShift
+		// Stream characteristics
+		streamAmplitude := peak * (0.15 + float64(streamIndex)*0.02) * scale
 
-					// 3D micro-positioning with depth parallax
-					microX := 0.2 * math.Sin(layerPhase*2.5+radius*0.04) * perspectiveScale
-					microY := (0.2*math.Cos(layerPhase*2.8+radius*0.045) + zBobbing) * perspectiveScale
+		// Create organic stream path
+		streamLength := int(maxRadius * 0.8)
+		stepSize := 2.5 + float64(depthLayer)*0.3
 
-					x := centerX + int(finalRadius*math.Cos(finalAngle)+microX)
-					y := centerY + int(finalRadius*math.Sin(finalAngle)+microY)
+		for pos := 3.0; pos < float64(streamLength); pos += stepSize {
+			posRatio := pos / float64(streamLength)
 
-					// Bounds check
-					if x >= 0 && x < width && y >= 0 && y < height {
-						// 3D organic character selection with depth influence
-						charPhase := float64(arm)*goldenRatio + radius*0.1 + float64(layer)*1.3 +
-							float64(depthLayer)*2.0 + organicOffset*0.5
-						charIndex := int(charPhase) % len(chars)
-						displayChar := chars[charIndex]
+			// Organic stream curvature - not spiral
+			streamCurve := streamAmplitude * math.Sin(pos*0.06+phase*1.4+streamPersonality*0.8)
+			organicWiggle := streamAmplitude * 0.5 * math.Cos(pos*0.09+phase*1.1+streamPersonality*0.5)
 
-						// 3D organic color generation with depth-based hues
-						hue := math.Mod(float64(arm)/float64(numArms)*goldenRatio+depthPhase*0.08+
-							organicOffset*0.03+float64(depthLayer)*0.1, 1)
+			// Current angle with organic deviation
+			currentAngle := startAngle + phase*rotationSpeed + streamCurve*0.08 + organicWiggle*0.05
 
-						// 3D saturation with depth attenuation - more muted
-						saturation := (0.3 + peak*0.2 - float64(layer)*0.05) * (0.5 + depthRatio*0.5)
-						saturation = math.Max(0.05, math.Min(0.6, saturation))
+			// Organic radius with natural pulsing
+			baseRadius := pos * (0.9 + 0.2*math.Sin(phase*1.6+streamPersonality))
+			radiusPulse := 1 + 0.03*math.Sin(phase*2.0+pos*0.04)*scale
+			finalRadius := baseRadius * radiusPulse
 
-						// 3D brightness with depth-based dimming - softer
-						baseValue := (0.4 + peak*0.2 + organicOffset*0.02 - float64(layer)*0.05) *
-							(0.3 + depthRatio*0.7)
-						depthDimming := 1.0 - (1.0-depthRatio)*0.3 // Back layers dimmer but gentler
-						value := baseValue * depthDimming
-						value = math.Max(0.15, math.Min(0.7, value))
+			x := centerX + int(finalRadius*math.Cos(currentAngle))
+			y := centerY + int(finalRadius*math.Sin(currentAngle))
 
-						spiralColor := HSVToRGB(hue, saturation, value)
+			if x >= 0 && x < width && y >= 0 && y < height {
+				// Character selection
+				charPhase := streamPersonality + pos*0.07 + streamCurve*0.3
+				charIndex := int(math.Abs(charPhase)) % len(chars)
+				streamChar := chars[charIndex]
 
-						// 3D very gentle transparency effect with depth
-						distanceRatio := radius / (depthMaxRadius * layerScale)
-						depthTransparency := 0.4 + depthRatio*0.6 // Back layers more transparent
+				// Organic color
+				hue := math.Mod(streamPersonality*0.3+phase*0.05+streamCurve*0.02, 1)
+				saturation := (0.2 + peak*0.1) * (0.6 + posRatio*0.3) * scale
+				saturation = math.Max(0.03, math.Min(0.4, saturation))
 
-						if distanceRatio > 0.6 || peak < 0.3 {
-							intensity := math.Max(0.15, 1-distanceRatio*0.8) *
-								math.Max(0.15, peak*1.5) * depthTransparency
-							if intensity < 0.8 {
-								displayChar = '·'
-							}
-						}
+				value := (0.25 + peak*0.1) * (0.5 + posRatio*0.4) * scale
+				value = math.Max(0.08, math.Min(0.5, value))
 
-						screen.SetContent(x, y, displayChar, nil, tcell.StyleDefault.Foreground(spiralColor))
+				streamColor := HSVToRGB(hue, saturation, value)
 
-						// 3D very rare, gentle branching with depth considerations
-						if math.Mod(radius, goldenRatio*15) < 0.3 && peak > 0.6 && depthLayer < 3 {
-							draw3DSpiralBranch(screen, x, y, finalAngle, spiralColor, peak, layer,
-								depthLayer, perspectiveScale, width, height)
-						}
-					}
+				// Subtle transparency
+				if posRatio > 0.8 || math.Abs(streamCurve) < streamAmplitude*0.4 {
+					streamChar = '·'
+				}
 
-					// 3D gentle, sparse radius progression with depth scaling
-					radius += baseStep + organicOffset*0.05*perspectiveScale
-					angle += (0.06 + peak*0.02) * goldenAngle * 0.3 * (1 + depthRatio*0.2)
+				screen.SetContent(x, y, streamChar, nil, tcell.StyleDefault.Foreground(streamColor))
+			}
+		}
+	}
+}
+
+// drawGrowthTendrils creates organic growth patterns like plant tendrils
+func drawGrowthTendrils(screen tcell.Screen, centerX, centerY int, maxRadius, phase float64,
+	depthLayer int, scale, peak float64, chars []rune, width, height int) {
+
+	goldenRatio := (1 + math.Sqrt(5)) / 2
+	goldenAngle := math.Pi * (3 - math.Sqrt(5))
+
+	// Organic tendrils based on peak
+	numTendrils := 1 + int(peak*2)
+	if numTendrils > 4 {
+		numTendrils = 4
+	}
+
+	for tendrilIndex := 0; tendrilIndex < numTendrils; tendrilIndex++ {
+		tendrilPersonality := float64(tendrilIndex)*goldenRatio*1.6 + float64(depthLayer)*1.1
+
+		// Organic growth direction
+		growthAngle := tendrilPersonality * goldenAngle * 0.7
+
+		// Growth characteristics
+		tendrilAmplitude := peak * (0.1 + float64(tendrilIndex)*0.02) * scale
+		growthSpeed := 0.08 + float64(tendrilIndex)*0.02
+
+		// Organic growth path
+		maxGrowthSteps := int(maxRadius * 0.6)
+		currentAngle := growthAngle
+
+		for growth := 2.0; growth < float64(maxGrowthSteps); growth += 2.8 + float64(depthLayer)*0.2 {
+			growthRatio := growth / float64(maxGrowthSteps)
+
+			// Organic tendril curvature - like plant growth
+			growthCurve := tendrilAmplitude * math.Sin(growth*0.08+phase*1.3+tendrilPersonality)
+			organicTwist := tendrilAmplitude * 0.4 * math.Cos(growth*0.12+phase*0.9+tendrilPersonality*0.6)
+
+			// Natural growth angle changes
+			angleChange := (growthCurve + organicTwist) * 0.06
+			currentAngle += angleChange + growthSpeed*goldenAngle*0.2
+
+			// Organic growth radius
+			growthRadius := growth * (1 + 0.1*math.Sin(phase*1.8+tendrilPersonality))
+
+			// Organic breathing
+			breathe := 1 + 0.02*math.Sin(phase*2.3+growth*0.05)*scale
+			finalRadius := growthRadius * breathe
+
+			x := centerX + int(finalRadius*math.Cos(currentAngle))
+			y := centerY + int(finalRadius*math.Sin(currentAngle))
+
+			if x >= 0 && x < width && y >= 0 && y < height {
+				// Character selection
+				charPhase := tendrilPersonality + growth*0.06 + growthCurve*0.2
+				charIndex := int(math.Abs(charPhase)) % len(chars)
+				tendrilChar := chars[charIndex]
+
+				// Very subtle organic color
+				hue := math.Mod(tendrilPersonality*0.2+phase*0.04, 1)
+				saturation := (0.15 + peak*0.08) * (0.3 + growthRatio*0.5) * scale
+				saturation = math.Max(0.02, math.Min(0.3, saturation))
+
+				value := (0.2 + peak*0.08) * (0.4 + growthRatio*0.4) * scale
+				value = math.Max(0.06, math.Min(0.4, value))
+
+				tendrilColor := HSVToRGB(hue, saturation, value)
+
+				// Growth-based transparency
+				if growthRatio > 0.85 || math.Abs(growthCurve) < tendrilAmplitude*0.5 {
+					tendrilChar = '·'
+				}
+
+				screen.SetContent(x, y, tendrilChar, nil, tcell.StyleDefault.Foreground(tendrilColor))
+
+				// Rare organic branching
+				if int(growth)%15 == 0 && peak > 0.5 && depthLayer < 2 {
+					drawTendrilBranch(screen, x, y, currentAngle, tendrilColor, peak, scale, width, height)
 				}
 			}
 		}
 	}
 }
 
-// draw3DSpiralBranch creates very subtle 3D organic branches for spiral arms with depth effects
-func draw3DSpiralBranch(screen tcell.Screen, x, y int, baseAngle float64, color tcell.Color,
-	amplitude float64, layer, depthLayer int, perspectiveScale float64, width, height int) {
+// drawTendrilBranch creates small organic branches from growth tendrils
+func drawTendrilBranch(screen tcell.Screen, x, y int, baseAngle float64, color tcell.Color,
+	amplitude, scale float64, width, height int) {
 
 	branchChars := []rune{'·', '˙', '∘'}
-	goldenRatio := (1 + math.Sqrt(5)) / 2
-	goldenAngle := math.Pi * (3 - math.Sqrt(5))
 	basePhase := GetBasePhase()
+	goldenRatio := (1 + math.Sqrt(5)) / 2
 
-	// 3D very minimal branching scaled by depth
-	branchLength := int(float64(1+int(amplitude*1.5)) * perspectiveScale)
+	// Very small organic branches
+	branchLength := int(float64(1+int(amplitude*2)) * scale)
 	if branchLength > 3 {
 		branchLength = 3
 	}
@@ -190,49 +318,30 @@ func draw3DSpiralBranch(screen tcell.Screen, x, y int, baseAngle float64, color 
 		branchLength = 1
 	}
 
-	// 3D create very minimal branches with depth variation
-	numBranches := 1 // Keep it super minimal for laid-back feel
+	// Single subtle branch
+	branchPersonality := baseAngle + float64(x+y)*0.01
 
-	for branch := 0; branch < numBranches; branch++ {
-		branchPersonality := float64(layer)*goldenRatio + float64(branch)*1.5 + float64(depthLayer)*0.8
+	for step := 1; step <= branchLength; step++ {
+		stepRatio := float64(step) / float64(branchLength)
 
-		// 3D very gentle branch angle with depth influence
-		organicVariation := math.Sin(basePhase*0.8+branchPersonality) * 0.08 * perspectiveScale
-		depthAngleVariation := float64(depthLayer) * 0.05 * math.Cos(basePhase*0.6+branchPersonality)
-		branchAngle := baseAngle + (float64(branch)*2-1)*0.2*goldenRatio*perspectiveScale +
-			organicVariation + depthAngleVariation
+		// Organic branch curve
+		branchCurve := math.Sin(stepRatio*math.Pi*1.1+branchPersonality) * 0.2 * scale
+		branchAngle := baseAngle + branchCurve + math.Sin(basePhase*1.5+branchPersonality)*0.1
 
-		for step := 1; step <= branchLength; step++ {
-			stepRatio := float64(step) / float64(branchLength)
+		// Organic branch length
+		branchRadius := float64(step) * (0.3 + math.Sin(stepRatio*math.Pi)*0.1) * scale
 
-			// 3D organic branch curve with depth influence
-			branchCurve := math.Sin(stepRatio*math.Pi*1.2+branchPersonality) * 0.3 * perspectiveScale
-			depthCurve := math.Cos(basePhase*1.5+float64(depthLayer)*goldenAngle+stepRatio) * 0.1
+		branchX := x + int(branchRadius*math.Cos(branchAngle))
+		branchY := y + int(branchRadius*math.Sin(branchAngle))
 
-			// 3D branch angle curves organically with depth
-			currentAngle := branchAngle + branchCurve + depthCurve
+		if branchX >= 0 && branchX < width && branchY >= 0 && branchY < height {
+			charIndex := step % len(branchChars)
+			branchChar := branchChars[charIndex]
 
-			// 3D organic branch radius with flowing variations and perspective
-			baseRadius := float64(step) * (0.4 + math.Sin(stepRatio*math.Pi)*0.2) * perspectiveScale
-			radiusFlow := 1 + 0.08*math.Sin(basePhase*2.0+branchPersonality+stepRatio*2)*perspectiveScale
-			branchRadius := baseRadius * radiusFlow
-
-			branchX := x + int(branchRadius*math.Cos(currentAngle))
-			branchY := y + int(branchRadius*math.Sin(currentAngle))
-
-			if branchX >= 0 && branchX < width && branchY >= 0 && branchY < height {
-				charIndex := (step + branch + layer + depthLayer) % len(branchChars)
-				branchChar := branchChars[charIndex]
-
-				// 3D very gentle fade with depth attenuation
-				flowIntensity := 1.0 + math.Abs(branchCurve)*0.3
-				depthAttenuation := 0.5 + float64(depthLayer)/8.0*0.5 // Very gentle dimming
-				intensity := (1.0 - stepRatio*0.8) * flowIntensity * goldenRatio * 0.4 *
-					perspectiveScale * depthAttenuation
-
-				if intensity > 0.5 { // Higher threshold for gentler appearance
-					screen.SetContent(branchX, branchY, branchChar, nil, tcell.StyleDefault.Foreground(color))
-				}
+			// Gentle fade
+			intensity := (1.0 - stepRatio*0.7) * goldenRatio * 0.3 * scale
+			if intensity > 0.4 {
+				screen.SetContent(branchX, branchY, branchChar, nil, tcell.StyleDefault.Foreground(color))
 			}
 		}
 	}
