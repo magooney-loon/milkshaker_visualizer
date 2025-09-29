@@ -616,35 +616,130 @@ func drawZigZag(screen tcell.Screen, width, height int, color tcell.Color, char 
 
 func drawSpiral(screen tcell.Screen, width, height int, color tcell.Color, char rune, rng *rand.Rand, peak float64) {
 	centerX, centerY := width/2, height/2
-	radius := 1.0 * peak
-	angle := 0.0
-	angleStep := 0.1
-
-	amplitude := 5.0 * peak
-	frequency := 0.2 + 0.1*peak
 	basePhase := float64(time.Now().UnixNano()) / 1e9
+	maxRadius := float64(min(width, height)) / 2
 
-	for radius < float64(min(width, height))/2 {
-		waveOffset := amplitude * math.Sin(frequency*angle+basePhase)
-		x := centerX + int((radius+waveOffset)*math.Cos(angle))
-		y := centerY + int((radius+waveOffset)*math.Sin(angle))
-		screen.SetContent(x, y, char, nil, tcell.StyleDefault.Foreground(color))
-		radius += 0.1
-		angle += angleStep
+	// Dynamic number of spiral arms based on peak
+	numArms := 3 + int(peak*4)
+
+	for arm := 0; arm < numArms; arm++ {
+		armOffset := float64(arm) * 2 * math.Pi / float64(numArms)
+		armRotation := basePhase * 0.5 * float64(1+arm%2*2-1) // Alternate rotation directions
+
+		// Each arm has its own characteristics
+		armAmplitude := (2.0 + float64(arm)*0.5) * peak
+		armFrequency := 0.3 + 0.1*float64(arm) + 0.2*peak
+
+		radius := 1.0 + float64(arm)*2
+		angle := armOffset + armRotation
+		angleStep := 0.08 + peak*0.05
+
+		// Multi-layered spiral per arm
+		for layer := 0; layer < 2+int(peak*2); layer++ {
+			layerRadius := radius
+			layerAngle := angle + float64(layer)*0.3
+
+			for layerRadius < maxRadius {
+				// Complex wave function combining multiple frequencies
+				wave1 := armAmplitude * math.Sin(armFrequency*layerAngle+basePhase)
+				wave2 := armAmplitude * 0.5 * math.Cos(armFrequency*2*layerAngle+basePhase*1.5)
+				wave3 := armAmplitude * 0.3 * math.Sin(armFrequency*0.5*layerAngle+basePhase*0.7)
+				waveOffset := wave1 + wave2 + wave3
+
+				// Pulsing radius effect
+				pulseRadius := layerRadius * (1 + 0.2*math.Sin(basePhase*2+float64(arm)*0.5))
+
+				finalRadius := pulseRadius + waveOffset
+
+				x := centerX + int(finalRadius*math.Cos(layerAngle))
+				y := centerY + int(finalRadius*math.Sin(layerAngle))
+
+				// Dynamic character selection based on layer and distance
+				chars := []rune{'•', '◦', '○', '◎', '◉', '⚬', '⚭', '⚮', '*', '✦', '✧', '✩', '✪', '✫', '✬', '✭', '✮', '✯', '✰', '✱'}
+				charIndex := (layer*arm + int(layerRadius)) % len(chars)
+				displayChar := chars[charIndex]
+
+				// Color variation based on arm and layer
+				hue := float64(arm)/float64(numArms) + basePhase*0.1
+				saturation := 0.7 + peak*0.3
+				value := 0.6 + peak*0.4 - float64(layer)*0.1
+				armColor := hsvToRGB(math.Mod(hue, 1), saturation, value)
+
+				screen.SetContent(x, y, displayChar, nil, tcell.StyleDefault.Foreground(armColor))
+
+				layerRadius += 0.8 + peak*0.5
+				layerAngle += angleStep
+			}
+		}
 	}
 }
 
 func drawStarburst(screen tcell.Screen, width, height int, color tcell.Color, char rune, rng *rand.Rand, peak float64) {
 	centerX, centerY := width/2, height/2
 	basePhase := float64(time.Now().UnixNano()) / 1e9
-	amplitude := 5.0 * peak
+	maxRadius := float64(min(width, height)) / 2
 
-	for angle := 0.0; angle < 2*math.Pi; angle += math.Pi / 8 {
-		for radius := 0.0; radius < float64(min(width, height))/2; radius += peak {
-			waveOffset := amplitude * math.Sin(angle+basePhase)
-			x := centerX + int((radius+waveOffset)*math.Cos(angle))
-			y := centerY + int((radius+waveOffset)*math.Sin(angle))
-			screen.SetContent(x, y, char, nil, tcell.StyleDefault.Foreground(color))
+	// Dynamic number of rays based on peak intensity
+	numRays := 12 + int(peak*16)
+	rayAngleStep := 2 * math.Pi / float64(numRays)
+
+	for rayIndex := 0; rayIndex < numRays; rayIndex++ {
+		baseAngle := float64(rayIndex) * rayAngleStep
+
+		// Each ray rotates at different speeds
+		rayRotation := basePhase * (0.5 + float64(rayIndex%3)*0.3)
+		finalAngle := baseAngle + rayRotation
+
+		// Multiple beams per ray for thickness effect
+		beamCount := 1 + int(peak*3)
+		for beam := 0; beam < beamCount; beam++ {
+			beamAngle := finalAngle + (float64(beam)-float64(beamCount)/2)*0.05
+
+			// Variable ray length with pulsing
+			rayLength := maxRadius * (0.6 + 0.4*math.Sin(basePhase*3+float64(rayIndex)*0.2))
+
+			// Dynamic step size for ray density
+			stepSize := 0.8 + peak*0.7
+
+			for radius := 2.0; radius < rayLength; radius += stepSize {
+				// Complex wave patterns along each ray
+				distancePhase := radius * 0.1
+				wave1 := 8.0 * peak * math.Sin(distancePhase+basePhase*2)
+				wave2 := 4.0 * peak * math.Cos(distancePhase*1.5+basePhase*1.3)
+				wave3 := 2.0 * peak * math.Sin(distancePhase*3+basePhase*0.8)
+
+				// Branching effect - rays can split
+				branchOffset := wave1 + wave2 + wave3
+
+				// Main ray
+				mainX := centerX + int((radius+branchOffset)*math.Cos(beamAngle))
+				mainY := centerY + int((radius+branchOffset)*math.Sin(beamAngle))
+
+				// Distance-based character selection
+				chars := []rune{'∙', '•', '●', '◉', '⬢', '⬡', '◆', '◇', '★', '☆', '✦', '✧', '✩', '✪', '✫', '✬', '✭', '✮', '✯', '✰'}
+				charIndex := (rayIndex + int(radius*2) + beam) % len(chars)
+				rayChar := chars[charIndex]
+
+				// Dynamic color based on distance and ray index
+				colorPhase := float64(rayIndex)/float64(numRays) + radius*0.01 + basePhase*0.2
+				hue := math.Mod(colorPhase, 1)
+				saturation := 0.8 + peak*0.2
+				value := 0.9 - radius/maxRadius*0.4 + peak*0.1
+				rayColor := hsvToRGB(hue, saturation, math.Max(0.1, value))
+
+				screen.SetContent(mainX, mainY, rayChar, nil, tcell.StyleDefault.Foreground(rayColor))
+
+				// Add branching sub-rays at certain intervals
+				if int(radius)%15 == 0 && peak > 0.3 {
+					for branch := 0; branch < 2; branch++ {
+						branchAngle := beamAngle + (float64(branch)*2-1)*0.3
+						branchRadius := radius * 0.3
+						branchX := centerX + int(branchRadius*math.Cos(branchAngle))
+						branchY := centerY + int(branchRadius*math.Sin(branchAngle))
+						screen.SetContent(branchX, branchY, '·', nil, tcell.StyleDefault.Foreground(rayColor))
+					}
+				}
+			}
 		}
 	}
 }
@@ -721,6 +816,13 @@ func abs(x int) int {
 		return -x
 	}
 	return x
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 const (
