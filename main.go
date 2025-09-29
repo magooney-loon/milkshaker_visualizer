@@ -28,6 +28,9 @@ func main() {
 		case "test-audio":
 			testAudioCapture()
 			return
+		case "test-monitor":
+			testMonitorSource()
+			return
 		case "help":
 			showHelp()
 			return
@@ -105,6 +108,52 @@ func testAudioCapture() {
 	tester.Run()
 }
 
+func testMonitorSource() {
+	fmt.Println("MONITOR SOURCE TEST")
+	fmt.Println("===================")
+	fmt.Println("This will test if the monitor source is properly configured.")
+	fmt.Println()
+
+	player := audio.NewPlayer()
+
+	// Initialize but don't start the full visualizer
+	if err := player.Initialize(); err != nil {
+		fmt.Printf("❌ Failed to initialize: %v\n", err)
+		return
+	}
+	defer player.Cleanup()
+
+	fmt.Println("\nTesting audio capture from configured source...")
+	fmt.Println("Play some music and you should see audio levels below:")
+	fmt.Println("Press Ctrl+C to stop")
+	fmt.Println()
+
+	// Start capture
+	if err := player.Start(); err != nil {
+		fmt.Printf("❌ Failed to start capture: %v\n", err)
+		return
+	}
+
+	// Monitor for a bit
+	for i := 0; i < 100; i++ {
+		time.Sleep(100 * time.Millisecond)
+		peak := player.GetPeakLevel()
+
+		if peak > 0.1 {
+			fmt.Printf("🎵 STRONG audio detected: %.3f\n", peak)
+		} else if peak > 0.01 {
+			fmt.Printf("🔉 Medium audio detected: %.3f\n", peak)
+		} else if peak > 0.001 {
+			fmt.Printf("🔈 Low audio detected: %.3f\n", peak)
+		} else {
+			fmt.Printf("🔇 No audio: %.6f\n", peak)
+		}
+	}
+
+	player.Stop()
+	fmt.Println("\nTest completed!")
+}
+
 func showHelp() {
 	fmt.Println("MILKSHAKER VISUALIZER")
 	fmt.Println("====================")
@@ -114,6 +163,7 @@ func showHelp() {
 	fmt.Println("  go run . devices         # List available audio devices")
 	fmt.Println("  go run . setup-audio     # Show audio setup instructions")
 	fmt.Println("  go run . test-audio      # Test audio capture without UI")
+	fmt.Println("  go run . test-monitor    # Test monitor source configuration")
 	fmt.Println("  go run . help            # Show this help")
 	fmt.Println()
 	fmt.Println("Controls (when running):")

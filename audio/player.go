@@ -35,7 +35,7 @@ func NewPlayer() *Player {
 // Initialize sets up the audio system
 func (p *Player) Initialize() error {
 	// Automatically detect and set the active audio monitor
-	p.setupCurrentAudioMonitor()
+	monitorSource := p.setupCurrentAudioMonitor()
 
 	err := portaudio.Initialize()
 	if err != nil {
@@ -59,20 +59,60 @@ func (p *Player) Initialize() error {
 		return fmt.Errorf("no input devices found")
 	}
 
-	// Find the best device (prefer one with many channels, likely a monitor)
+	// Verify our monitor source is available
+	p.verifyMonitorSource(monitorSource)
+
+	// Find the best device - prioritize devices that match our monitor source
 	var selectedDevice *portaudio.DeviceInfo
-	for _, device := range p.devices {
-		if device.MaxInputChannels >= 32 {
-			selectedDevice = device
-			fmt.Printf("Auto-selected: %s (%d channels)\n", device.Name, device.MaxInputChannels)
-			break
+
+	// First priority: Look for device that matches our monitor source
+	if monitorSource != "" {
+		fmt.Printf("\nSearching for device matching monitor source: %s\n", monitorSource)
+		for _, device := range p.devices {
+			deviceName := strings.ToLower(device.Name)
+			// monitorName := strings.ToLower(monitorSource)
+
+			// Check if device name contains parts of our monitor source
+			if strings.Contains(deviceName, "pulse") || strings.Contains(deviceName, "pipewire") {
+				selectedDevice = device
+				fmt.Printf("Selected PulseAudio compatible device: %s (%d channels)\n", device.Name, device.MaxInputChannels)
+				break
+			}
 		}
 	}
 
+	// Second priority: Look for pulse/pipewire devices (these respect PulseAudio routing)
+	if selectedDevice == nil {
+		for _, device := range p.devices {
+			deviceName := strings.ToLower(device.Name)
+			if (strings.Contains(deviceName, "pulse") || strings.Contains(deviceName, "pipewire")) && device.MaxInputChannels >= 16 {
+				selectedDevice = device
+				fmt.Printf("Auto-selected PulseAudio device: %s (%d channels)\n", device.Name, device.MaxInputChannels)
+				break
+			}
+		}
+	}
+
+	// Third priority: Any device with many channels
+	if selectedDevice == nil {
+		for _, device := range p.devices {
+			if device.MaxInputChannels >= 32 {
+				selectedDevice = device
+				fmt.Printf("Auto-selected high-channel device: %s (%d channels)\n", device.Name, device.MaxInputChannels)
+				break
+			}
+		}
+	}
+
+	// Fallback: Default input device
 	if selectedDevice == nil {
 		defaultInput, _ := portaudio.DefaultInputDevice()
 		selectedDevice = defaultInput
-		fmt.Printf("Using default: %s\n", selectedDevice.Name)
+		if selectedDevice != nil {
+			fmt.Printf("Using default: %s\n", selectedDevice.Name)
+		} else {
+			fmt.Println("Warning: No suitable audio device found")
+		}
 	}
 
 	// Set current device index
@@ -92,15 +132,23 @@ func (p *Player) openStream(device *portaudio.DeviceInfo) error {
 		p.paStream.Close()
 	}
 
+	// Use fewer channels for better compatibility
+	channels := 2
+	if device.MaxInputChannels == 1 {
+		channels = 1
+	}
+
 	streamParams := portaudio.StreamParameters{
 		Input: portaudio.StreamDeviceParameters{
 			Device:   device,
-			Channels: 2,
+			Channels: channels,
 			Latency:  device.DefaultLowInputLatency,
 		},
 		SampleRate:      44100,
 		FramesPerBuffer: 1024,
 	}
+
+	fmt.Printf("Opening stream with %d channels at 44100 Hz\n", channels)
 
 	var err error
 	p.paStream, err = portaudio.OpenStream(streamParams, p.audioCallback)
@@ -279,7 +327,7 @@ func (p *Player) SetUpdateInfoFunc(fn func()) {
 }
 
 // setupCurrentAudioMonitor automatically configures PulseAudio monitor
-func (p *Player) setupCurrentAudioMonitor() {
+func (p *Player) setupCurrentAudioMonitor() string {
 	fmt.Println("=== AUTO-DETECTING ACTIVE AUDIO OUTPUT ===")
 
 	// Get list of sinks and find the one that's RUNNING
@@ -287,7 +335,7 @@ func (p *Player) setupCurrentAudioMonitor() {
 	output, err := cmd.Output()
 	if err != nil {
 		fmt.Printf("Could not query audio sinks: %v\n", err)
-		return
+		return ""
 	}
 
 	lines := strings.Split(string(output), "\n")
@@ -305,8 +353,23 @@ func (p *Player) setupCurrentAudioMonitor() {
 	}
 
 	if runningSink == "" {
-		fmt.Println("No actively running audio sink found")
-		return
+		fmt.Println("No actively running audio sink found, trying default sink...")
+		// Try to get default sink
+		cmd = exec.Command("pactl", "get-default-sink")
+		output, err = cmd.Output()
+		if err != nil {
+			fmt.Printf("Could not get default sink: %v\n", err)
+			return ""
+		}
+		runningSink = strings.TrimSpace(string(output))
+		if runningSink != "" {
+			fmt.Printf("Using default sink: %s\n", runningSink)
+		}
+	}
+
+	if runningSink == "" {
+		fmt.Println("No audio sink found")
+		return ""
 	}
 
 	// Set the monitor of the running sink as default source
@@ -315,9 +378,107 @@ func (p *Player) setupCurrentAudioMonitor() {
 	err = cmd.Run()
 	if err != nil {
 		fmt.Printf("Failed to set monitor source %s: %v\n", monitorSource, err)
-		return
+		return ""
 	}
 
 	fmt.Printf("✅ Auto-configured source: %s\n", monitorSource)
 	fmt.Println("This will capture system audio from your active output")
+
+	// Give PulseAudio a moment to propagate the change
+	time.Sleep(500 * time.Millisecond)
+
+	// Try to force the monitor source for applications
+	p.forceMonitorSource(monitorSource)
+
+	return monitorSource
+}
+
+// verifyMonitorSource checks if the configured monitor source is available
+func (p *Player) verifyMonitorSource(monitorSource string) {
+	if monitorSource == "" {
+		return
+	}
+
+	fmt.Println("\n=== VERIFYING MONITOR SOURCE ===")
+
+	// List PulseAudio sources
+	cmd := exec.Command("pactl", "list", "sources", "short")
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("Could not list sources: %v\n", err)
+		return
+	}
+
+	fmt.Println("Available PulseAudio sources:")
+	lines := strings.Split(string(output), "\n")
+	monitorFound := false
+
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			sourceName := parts[1]
+			fmt.Printf("  - %s\n", sourceName)
+			if sourceName == monitorSource {
+				monitorFound = true
+			}
+		}
+	}
+
+	if monitorFound {
+		fmt.Printf("✅ Monitor source %s is available\n", monitorSource)
+	} else {
+		fmt.Printf("❌ Monitor source %s not found in PulseAudio\n", monitorSource)
+	}
+
+	// Check current default source
+	cmd = exec.Command("pactl", "get-default-source")
+	output, err = cmd.Output()
+	if err == nil {
+		currentSource := strings.TrimSpace(string(output))
+		fmt.Printf("Current default source: %s\n", currentSource)
+		if currentSource == monitorSource {
+			fmt.Println("✅ Default source matches our monitor")
+		} else {
+			fmt.Println("⚠️  Default source doesn't match our monitor")
+		}
+	}
+}
+
+// forceMonitorSource tries to force applications to use the monitor source
+func (p *Player) forceMonitorSource(monitorSource string) {
+	if monitorSource == "" {
+		return
+	}
+
+	fmt.Println("\n=== FORCING MONITOR SOURCE ===")
+
+	// Try to move all recording streams to our monitor source
+	cmd := exec.Command("pactl", "list", "source-outputs", "short")
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("Could not list source outputs: %v\n", err)
+		return
+	}
+
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 1 {
+			sourceOutputId := parts[0]
+			// Move this source output to our monitor
+			moveCmd := exec.Command("pactl", "move-source-output", sourceOutputId, monitorSource)
+			if err := moveCmd.Run(); err == nil {
+				fmt.Printf("Moved source output %s to %s\n", sourceOutputId, monitorSource)
+			}
+		}
+	}
+
+	// Also try setting environment variable for new applications
+	fmt.Printf("Setting PULSE_SOURCE environment variable to: %s\n", monitorSource)
 }
