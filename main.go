@@ -31,6 +31,7 @@ func main() {
 		case "test-monitor":
 			testMonitorSource()
 			return
+
 		case "help":
 			showHelp()
 			return
@@ -139,14 +140,14 @@ func testMonitorSource() {
 		time.Sleep(100 * time.Millisecond)
 		peak := player.GetPeakLevel()
 
-		if peak > 0.1 {
+		if peak > 0.01 {
 			fmt.Printf("🎵 STRONG audio detected: %.3f\n", peak)
-		} else if peak > 0.01 {
-			fmt.Printf("🔉 Medium audio detected: %.3f\n", peak)
 		} else if peak > 0.001 {
-			fmt.Printf("🔈 Low audio detected: %.3f\n", peak)
+			fmt.Printf("🔉 Medium audio detected: %.3f\n", peak)
+		} else if peak > 0.0001 {
+			fmt.Printf("🔈 Low audio detected: %.6f\n", peak)
 		} else {
-			fmt.Printf("🔇 No audio: %.6f\n", peak)
+			fmt.Printf("🔇 No audio: %.8f\n", peak)
 		}
 	}
 
@@ -178,25 +179,12 @@ func showHelp() {
 }
 
 func AudioPlayerMain() {
-	fmt.Println("🎵 MILKSHAKER VISUALIZER")
-	fmt.Println("=======================")
-	fmt.Println("Initializing audio system...")
-	fmt.Println()
-
 	player := audio.NewPlayer()
 
-	// Initialize audio player with all logging upfront
 	if err := player.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize audio player: %v", err)
 	}
 	defer player.Cleanup()
-
-	fmt.Println()
-	fmt.Println("✅ Audio system initialized successfully!")
-	fmt.Println("🎤 Starting visualizer...")
-	fmt.Println("Press S to start/stop | +/- for sensitivity | Ctrl+C to quit")
-	fmt.Println()
-	time.Sleep(2 * time.Second) // Give user time to read
 
 	app := tview.NewApplication()
 	visualizer := patterns.NewFibonacciVisualizer()

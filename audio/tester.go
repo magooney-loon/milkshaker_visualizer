@@ -70,14 +70,14 @@ func (t *Tester) monitorAudio() {
 		peak := t.player.GetPeakLevel()
 		now := time.Now()
 
-		if peak > 0.01 {
-			fmt.Printf("\r🎵 STRONG: Peak=%.4f | %s", peak, now.Format("15:04:05"))
-		} else if peak > 0.001 {
-			fmt.Printf("\r🔉 Medium: Peak=%.4f | %s", peak, now.Format("15:04:05"))
+		if peak > 0.001 {
+			fmt.Printf("\r🎵 STRONG: Peak=%.6f | %s", peak, now.Format("15:04:05"))
 		} else if peak > 0.0001 {
-			fmt.Printf("\r🔈 Low: Peak=%.6f | %s", peak, now.Format("15:04:05"))
+			fmt.Printf("\r🔉 Medium: Peak=%.6f | %s", peak, now.Format("15:04:05"))
+		} else if peak > 0.00001 {
+			fmt.Printf("\r🔈 Low: Peak=%.8f | %s", peak, now.Format("15:04:05"))
 		} else {
-			fmt.Printf("\r🔇 Silent: Peak=%.8f | %s", peak, now.Format("15:04:05"))
+			fmt.Printf("\r🔇 Silent: Peak=%.10f | %s", peak, now.Format("15:04:05"))
 		}
 	}
 }

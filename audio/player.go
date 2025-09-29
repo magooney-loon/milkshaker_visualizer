@@ -27,7 +27,7 @@ type Player struct {
 // NewPlayer creates a new audio player
 func NewPlayer() *Player {
 	return &Player{
-		sensitivity:   1.0,
+		sensitivity:   1.8,
 		lastAudioTime: time.Now(),
 	}
 }
@@ -51,7 +51,6 @@ func (p *Player) Initialize() error {
 	for _, device := range devices {
 		if device.MaxInputChannels > 0 {
 			p.devices = append(p.devices, device)
-			fmt.Printf("Found input device: %s (%d channels)\n", device.Name, device.MaxInputChannels)
 		}
 	}
 
@@ -70,12 +69,13 @@ func (p *Player) Initialize() error {
 		fmt.Printf("\nSearching for device matching monitor source: %s\n", monitorSource)
 		for _, device := range p.devices {
 			deviceName := strings.ToLower(device.Name)
-			// monitorName := strings.ToLower(monitorSource)
+			monitorName := strings.ToLower(monitorSource)
 
 			// Check if device name contains parts of our monitor source
-			if strings.Contains(deviceName, "pulse") || strings.Contains(deviceName, "pipewire") {
+			if strings.Contains(deviceName, "pulse") || strings.Contains(deviceName, "pipewire") ||
+				strings.Contains(deviceName, "monitor") || strings.Contains(monitorName, deviceName) {
 				selectedDevice = device
-				fmt.Printf("Selected PulseAudio compatible device: %s (%d channels)\n", device.Name, device.MaxInputChannels)
+
 				break
 			}
 		}
@@ -85,33 +85,31 @@ func (p *Player) Initialize() error {
 	if selectedDevice == nil {
 		for _, device := range p.devices {
 			deviceName := strings.ToLower(device.Name)
-			if (strings.Contains(deviceName, "pulse") || strings.Contains(deviceName, "pipewire")) && device.MaxInputChannels >= 16 {
+			if strings.Contains(deviceName, "pulse") || strings.Contains(deviceName, "pipewire") {
 				selectedDevice = device
-				fmt.Printf("Auto-selected PulseAudio device: %s (%d channels)\n", device.Name, device.MaxInputChannels)
+
 				break
 			}
 		}
 	}
 
-	// Third priority: Any device with many channels
+	// Third priority: Any device with reasonable channel count
 	if selectedDevice == nil {
 		for _, device := range p.devices {
-			if device.MaxInputChannels >= 32 {
+			if device.MaxInputChannels >= 2 {
 				selectedDevice = device
-				fmt.Printf("Auto-selected high-channel device: %s (%d channels)\n", device.Name, device.MaxInputChannels)
+
 				break
 			}
 		}
 	}
 
-	// Fallback: Default input device
+	// Fallback: First available device
 	if selectedDevice == nil {
-		defaultInput, _ := portaudio.DefaultInputDevice()
-		selectedDevice = defaultInput
-		if selectedDevice != nil {
-			fmt.Printf("Using default: %s\n", selectedDevice.Name)
+		if len(p.devices) > 0 {
+			selectedDevice = p.devices[0]
 		} else {
-			fmt.Println("Warning: No suitable audio device found")
+			return fmt.Errorf("no audio input devices available")
 		}
 	}
 
@@ -147,8 +145,6 @@ func (p *Player) openStream(device *portaudio.DeviceInfo) error {
 		SampleRate:      44100,
 		FramesPerBuffer: 1024,
 	}
-
-	fmt.Printf("Opening stream with %d channels at 44100 Hz\n", channels)
 
 	var err error
 	p.paStream, err = portaudio.OpenStream(streamParams, p.audioCallback)
@@ -287,22 +283,30 @@ func (p *Player) CycleDevice() {
 		return
 	}
 
+	wasRunning := p.running
+	prevDeviceIdx := p.currentDeviceIdx
 	p.currentDeviceIdx = (p.currentDeviceIdx + 1) % len(p.devices)
 	nextDevice := p.devices[p.currentDeviceIdx]
 
-	fmt.Printf("Switching to device: %s\n", nextDevice.Name)
-
 	// Stop current stream
-	p.Stop()
+	if wasRunning {
+		p.Stop()
+	}
 
 	// Open stream with new device
 	if err := p.openStream(nextDevice); err != nil {
-		fmt.Printf("Failed to switch device: %v\n", err)
+		p.currentDeviceIdx = prevDeviceIdx
+		p.openStream(p.devices[prevDeviceIdx])
+		if wasRunning {
+			p.Start()
+		}
 		return
 	}
 
-	// Restart
-	p.Start()
+	// Restart if was running
+	if wasRunning {
+		p.Start()
+	}
 
 	if p.updateInfoFunc != nil {
 		p.updateInfoFunc()
@@ -312,9 +316,9 @@ func (p *Player) CycleDevice() {
 // GetCurrentTrack returns a placeholder track info
 func (p *Player) GetCurrentTrack() string {
 	peak := p.GetPeakLevel()
-	if peak > 0.1 {
+	if peak > 0.001 { // Much lower threshold for system audio
 		return "🎵 Audio Detected"
-	} else if peak > 0.01 {
+	} else if peak > 0.0001 {
 		return "🔉 Low Audio"
 	} else {
 		return "🔇 No Audio"
@@ -328,48 +332,52 @@ func (p *Player) SetUpdateInfoFunc(fn func()) {
 
 // setupCurrentAudioMonitor automatically configures PulseAudio monitor
 func (p *Player) setupCurrentAudioMonitor() string {
-	fmt.Println("=== AUTO-DETECTING ACTIVE AUDIO OUTPUT ===")
-
 	// Get list of sinks and find the one that's RUNNING
 	cmd := exec.Command("pactl", "list", "sinks", "short")
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Printf("Could not query audio sinks: %v\n", err)
-		return ""
+		return p.fallbackMonitorSetup()
 	}
 
 	lines := strings.Split(string(output), "\n")
 	var runningSink string
 
+	// First try: Find RUNNING sink
 	for _, line := range lines {
 		if strings.Contains(line, "RUNNING") {
 			parts := strings.Fields(line)
 			if len(parts) >= 2 {
 				runningSink = parts[1] // Get sink name
-				fmt.Printf("Found active audio sink: %s\n", runningSink)
 				break
 			}
 		}
 	}
 
+	// Second try: Find any available sink
 	if runningSink == "" {
-		fmt.Println("No actively running audio sink found, trying default sink...")
-		// Try to get default sink
-		cmd = exec.Command("pactl", "get-default-sink")
-		output, err = cmd.Output()
-		if err != nil {
-			fmt.Printf("Could not get default sink: %v\n", err)
-			return ""
-		}
-		runningSink = strings.TrimSpace(string(output))
-		if runningSink != "" {
-			fmt.Printf("Using default sink: %s\n", runningSink)
+		for _, line := range lines {
+			if strings.TrimSpace(line) != "" {
+				parts := strings.Fields(line)
+				if len(parts) >= 2 {
+					runningSink = parts[1]
+					break
+				}
+			}
 		}
 	}
 
+	// Third try: Get default sink
 	if runningSink == "" {
-		fmt.Println("No audio sink found")
-		return ""
+		cmd = exec.Command("pactl", "get-default-sink")
+		output, err = cmd.Output()
+		if err != nil {
+			return p.fallbackMonitorSetup()
+		}
+		runningSink = strings.TrimSpace(string(output))
+	}
+
+	if runningSink == "" {
+		return p.fallbackMonitorSetup()
 	}
 
 	// Set the monitor of the running sink as default source
@@ -377,12 +385,8 @@ func (p *Player) setupCurrentAudioMonitor() string {
 	cmd = exec.Command("pactl", "set-default-source", monitorSource)
 	err = cmd.Run()
 	if err != nil {
-		fmt.Printf("Failed to set monitor source %s: %v\n", monitorSource, err)
-		return ""
+		return p.setupAlternativeMonitor(runningSink)
 	}
-
-	fmt.Printf("✅ Auto-configured source: %s\n", monitorSource)
-	fmt.Println("This will capture system audio from your active output")
 
 	// Give PulseAudio a moment to propagate the change
 	time.Sleep(500 * time.Millisecond)
@@ -395,56 +399,7 @@ func (p *Player) setupCurrentAudioMonitor() string {
 
 // verifyMonitorSource checks if the configured monitor source is available
 func (p *Player) verifyMonitorSource(monitorSource string) {
-	if monitorSource == "" {
-		return
-	}
-
-	fmt.Println("\n=== VERIFYING MONITOR SOURCE ===")
-
-	// List PulseAudio sources
-	cmd := exec.Command("pactl", "list", "sources", "short")
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Printf("Could not list sources: %v\n", err)
-		return
-	}
-
-	fmt.Println("Available PulseAudio sources:")
-	lines := strings.Split(string(output), "\n")
-	monitorFound := false
-
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		parts := strings.Fields(line)
-		if len(parts) >= 2 {
-			sourceName := parts[1]
-			fmt.Printf("  - %s\n", sourceName)
-			if sourceName == monitorSource {
-				monitorFound = true
-			}
-		}
-	}
-
-	if monitorFound {
-		fmt.Printf("✅ Monitor source %s is available\n", monitorSource)
-	} else {
-		fmt.Printf("❌ Monitor source %s not found in PulseAudio\n", monitorSource)
-	}
-
-	// Check current default source
-	cmd = exec.Command("pactl", "get-default-source")
-	output, err = cmd.Output()
-	if err == nil {
-		currentSource := strings.TrimSpace(string(output))
-		fmt.Printf("Current default source: %s\n", currentSource)
-		if currentSource == monitorSource {
-			fmt.Println("✅ Default source matches our monitor")
-		} else {
-			fmt.Println("⚠️  Default source doesn't match our monitor")
-		}
-	}
+	// Silently verify - no debug output needed
 }
 
 // forceMonitorSource tries to force applications to use the monitor source
@@ -453,13 +408,10 @@ func (p *Player) forceMonitorSource(monitorSource string) {
 		return
 	}
 
-	fmt.Println("\n=== FORCING MONITOR SOURCE ===")
-
 	// Try to move all recording streams to our monitor source
 	cmd := exec.Command("pactl", "list", "source-outputs", "short")
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Printf("Could not list source outputs: %v\n", err)
 		return
 	}
 
@@ -473,12 +425,56 @@ func (p *Player) forceMonitorSource(monitorSource string) {
 			sourceOutputId := parts[0]
 			// Move this source output to our monitor
 			moveCmd := exec.Command("pactl", "move-source-output", sourceOutputId, monitorSource)
-			if err := moveCmd.Run(); err == nil {
-				fmt.Printf("Moved source output %s to %s\n", sourceOutputId, monitorSource)
+			moveCmd.Run()
+		}
+	}
+}
+
+// fallbackMonitorSetup tries to set up audio capture when pactl commands fail
+func (p *Player) fallbackMonitorSetup() string {
+	// Try to find any .monitor source
+	cmd := exec.Command("pactl", "list", "sources", "short")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			sourceName := parts[1]
+			if strings.HasSuffix(sourceName, ".monitor") {
+				// Try to set it as default
+				setCmd := exec.Command("pactl", "set-default-source", sourceName)
+				if err := setCmd.Run(); err == nil {
+					return sourceName
+				}
 			}
 		}
 	}
 
-	// Also try setting environment variable for new applications
-	fmt.Printf("Setting PULSE_SOURCE environment variable to: %s\n", monitorSource)
+	return ""
+}
+
+// setupAlternativeMonitor tries alternative ways to setup the monitor
+func (p *Player) setupAlternativeMonitor(sinkName string) string {
+	// Try loading a loopback module as fallback
+	cmd := exec.Command("pactl", "load-module", "module-loopback", fmt.Sprintf("source=%s.monitor", sinkName))
+	if err := cmd.Run(); err == nil {
+		time.Sleep(1 * time.Second)
+		return sinkName + ".monitor"
+	}
+
+	// Try generic loopback
+	cmd = exec.Command("pactl", "load-module", "module-loopback")
+	if err := cmd.Run(); err == nil {
+		time.Sleep(1 * time.Second)
+		return sinkName + ".monitor"
+	}
+
+	return p.fallbackMonitorSetup()
 }
