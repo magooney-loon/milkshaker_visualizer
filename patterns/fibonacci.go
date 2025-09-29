@@ -177,6 +177,15 @@ func (v *FibonacciVisualizer) Draw(screen tcell.Screen) {
 				v.patternMgr.DrawRandomPattern(screen, rng, patternColor, amplitude)
 			}
 		}
+
+		// Draw logo at specific depth layers for integration
+		if layer >= 1 && layer <= 3 {
+			rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(layer)))
+			// Calculate representative amplitude for this layer
+			layerAmplitude := v.points[layer%len(v.points)]
+			logoColor := v.getOrganicColor(0, layer, 0, layerAmplitude, goldenRatio, 0, layerPhase)
+			DrawLogoLayer(screen, width, height, logoColor, '●', rng, layerAmplitude, layer)
+		}
 	}
 
 	// Smooth, organic angle updates

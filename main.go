@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"time"
 
@@ -216,7 +215,6 @@ func AudioPlayerMain() {
 		visualizer.UpdateWithPeak(peak)
 
 		visualizer.Draw(screen)
-		animateLogo(screen, x, y, width, height)
 		tview.Print(screen, infoTextNowPlaying.GetText(true), x, y, width, tview.AlignCenter, tcell.ColorWhite)
 
 		tview.Print(screen, infoTextVolume.GetText(true), x, y+1, width, tview.AlignCenter, tcell.ColorWhite)
@@ -275,116 +273,4 @@ func AudioPlayerMain() {
 	if err := app.SetRoot(fullScreenVisualizer, true).SetFocus(fullScreenVisualizer).Run(); err != nil {
 		fmt.Printf("\nVisualizer stopped: %v\n", err)
 	}
-}
-
-const (
-	logoRevealInterval  = 20 * time.Millisecond
-	cycleWaitDuration   = 20 * time.Second
-	stayVisibleDuration = 10 * time.Second
-)
-
-var (
-	lastLogoTime  time.Time
-	logoMask      [][]bool
-	revealedCount int
-	fadeOutCount  int
-	isFadingOut   bool
-	cycleEndTime  time.Time
-)
-
-func animateLogo(screen tcell.Screen, x, y, width, height int) {
-	now := time.Now()
-	if now.Sub(lastLogoTime) < logoRevealInterval {
-		return
-	}
-	lastLogoTime = now
-
-	logoFrames := []string{
-		" __    __     __     __         __  __     ______     __  __     ______     __  __     ______     ______    ",
-		"/\\ \"-./  \\   /\\ \\   /\\ \\       /\\ \\/ /    /\\  ___\\   /\\ \\_\\ \\   /\\  __ \\   /\\ \\/ /    /\\  ___\\   /\\  == \\   ",
-		"\\ \\ \\-./\\ \\  \\ \\ \\  \\ \\ \\____  \\ \\  _\"-.  \\ \\___  \\  \\ \\  __ \\  \\ \\  __ \\  \\ \\  _\"-.  \\ \\  __\\   \\ \\  __<   ",
-		" \\ \\_\\ \\ \\_\\  \\ \\_\\  \\ \\_____\\  \\ \\_\\ \\_\\  \\/\\_____\\  \\ \\_\\ \\_\\  \\ \\_\\ \\_\\  \\ \\_\\ \\_\\  \\ \\_____\\  \\ \\_\\ \\_\\ ",
-		"  \\/_/  \\/_/   \\/_/   \\/_____/   \\/_/\\/_/   \\/_____/   \\/_/\\/_/   \\/_/\\/_/   \\/_/\\/_/   \\/_____/   \\/_/ /_/ ",
-	}
-
-	middleY := y + (height / 2) - (len(logoFrames) / 2)
-	middleX := x + (width / 2) - (len(logoFrames[0]) / 2)
-
-	// Initialize logoMask if it's empty
-	if len(logoMask) == 0 {
-		logoMask = make([][]bool, len(logoFrames))
-		for i := range logoMask {
-			logoMask[i] = make([]bool, len(logoFrames[0]))
-		}
-	}
-
-	totalNonSpaceChars := countNonSpaceChars(logoFrames)
-
-	if cycleEndTime.IsZero() {
-		cycleEndTime = now.Add(stayVisibleDuration)
-	}
-
-	if !isFadingOut {
-		if revealedCount < totalNonSpaceChars {
-			for {
-				i := rand.Intn(len(logoMask))
-				j := rand.Intn(len(logoMask[0]))
-				if !logoMask[i][j] && logoFrames[i][j] != ' ' {
-					logoMask[i][j] = true
-					revealedCount++
-					break
-				}
-			}
-		} else if now.After(cycleEndTime) {
-			isFadingOut = true
-		}
-	} else {
-		if fadeOutCount < totalNonSpaceChars {
-			for {
-				i := rand.Intn(len(logoMask))
-				j := rand.Intn(len(logoMask[0]))
-				if logoMask[i][j] && logoFrames[i][j] != ' ' {
-					logoMask[i][j] = false
-					fadeOutCount++
-					break
-				}
-			}
-		} else {
-			cycleEndTime = now.Add(cycleWaitDuration)
-			resetCycle()
-		}
-	}
-
-	for i, line := range logoFrames {
-		for j, char := range line {
-			if logoMask[i][j] {
-				style := tcell.StyleDefault.Foreground(tcell.ColorFloralWhite)
-				screen.SetContent(middleX+j, middleY+i, rune(char), nil, style)
-			}
-		}
-	}
-}
-
-func countNonSpaceChars(logoFrames []string) int {
-	count := 0
-	for _, line := range logoFrames {
-		for _, char := range line {
-			if char != ' ' {
-				count++
-			}
-		}
-	}
-	return count
-}
-
-func resetCycle() {
-	for i := range logoMask {
-		for j := range logoMask[i] {
-			logoMask[i][j] = false
-		}
-	}
-	revealedCount = 0
-	fadeOutCount = 0
-	isFadingOut = false
-	lastLogoTime = time.Time{}
 }
