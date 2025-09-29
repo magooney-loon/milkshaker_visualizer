@@ -15,6 +15,7 @@ type Manager struct {
 func NewManager() *Manager {
 	return &Manager{
 		patterns: []PatternFunc{
+			DrawField,
 			DrawSpiral,
 			DrawStarburst,
 		},
