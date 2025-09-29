@@ -6,195 +6,346 @@ import (
 	"math"
 	"math/rand"
 	"os"
-	"path/filepath"
+	"os/exec"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
-	"github.com/faiface/beep"
-	"github.com/faiface/beep/effects"
-	"github.com/faiface/beep/mp3"
-	"github.com/faiface/beep/speaker"
 	"github.com/gdamore/tcell/v2"
+	"github.com/gordonklaus/portaudio"
 	"github.com/rivo/tview"
 )
 
 func main() {
-	MusicPlayerMain()
-}
-
-type MusicPlayer struct {
-	streamer         beep.StreamSeekCloser
-	ctrl             *beep.Ctrl
-	volume           *effects.Volume
-	format           beep.Format
-	done             chan bool
-	isPlaying        bool
-	currentTrack     string
-	tracks           []string
-	visualizer       *FibonacciVisualizer
-	stopVisualizer   chan bool
-	visualizerTicker *time.Ticker
-	playbackLock     sync.Mutex
-	updateInfoFunc   func()
-}
-
-func NewMusicPlayer() *MusicPlayer {
-	tracks := loadTracks()
-	return &MusicPlayer{
-		done:           make(chan bool),
-		tracks:         tracks,
-		visualizer:     NewFibonacciVisualizer(),
-		stopVisualizer: make(chan bool),
+	// Check for command line arguments
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "devices":
+			listAudioDevices()
+			return
+		case "setup-audio":
+			setupSystemAudio()
+			return
+		case "test-audio":
+			testAudioCapture()
+			return
+		case "help":
+			showHelp()
+			return
+		}
 	}
+	AudioPlayerMain()
 }
 
-func (mp *MusicPlayer) SetUpdateInfoFunc(updateFunc func()) {
-	mp.updateInfoFunc = updateFunc
-}
-
-func loadTracks() []string {
-	var tracks []string
-	files, err := os.ReadDir("media")
+func listAudioDevices() {
+	err := portaudio.Initialize()
 	if err != nil {
-		log.Printf("Error reading media directory: %v", err)
-		return tracks
+		log.Fatalf("Failed to initialize PortAudio: %v", err)
+	}
+	defer portaudio.Terminate()
+
+	devices, err := portaudio.Devices()
+	if err != nil {
+		log.Fatalf("Failed to get audio devices: %v", err)
 	}
 
-	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(strings.ToLower(file.Name()), ".mp3") {
-			tracks = append(tracks, filepath.Join("media", file.Name()))
+	fmt.Println("Available Audio Devices:")
+	fmt.Println("========================")
+
+	for i, device := range devices {
+		fmt.Printf("[%d] %s\n", i, device.Name)
+		fmt.Printf("    Max Input Channels: %d\n", device.MaxInputChannels)
+		fmt.Printf("    Max Output Channels: %d\n", device.MaxOutputChannels)
+		fmt.Printf("    Default Sample Rate: %.0f Hz\n", device.DefaultSampleRate)
+		if device.MaxInputChannels > 0 {
+			fmt.Printf("    Input Latency: %.3f ms\n", device.DefaultLowInputLatency.Seconds()*1000)
+		}
+		if device.MaxOutputChannels > 0 {
+			fmt.Printf("    Output Latency: %.3f ms\n", device.DefaultLowOutputLatency.Seconds()*1000)
+		}
+		fmt.Println()
+	}
+
+	defaultInput, err := portaudio.DefaultInputDevice()
+	if err == nil {
+		fmt.Printf("Default Input Device: %s\n", defaultInput.Name)
+	}
+
+	defaultOutput, err := portaudio.DefaultOutputDevice()
+	if err == nil {
+		fmt.Printf("Default Output Device: %s\n", defaultOutput.Name)
+	}
+}
+
+func setupSystemAudio() {
+	fmt.Println("Setting up system audio capture for Linux...")
+	fmt.Println("============================================")
+
+	fmt.Println("Method 1: Load PulseAudio loopback module")
+	fmt.Println("Run: pactl load-module module-loopback")
+	fmt.Println("This creates a loopback from output to input")
+	fmt.Println()
+
+	fmt.Println("Method 2: Check available monitor sources")
+	fmt.Println("Run: pactl list sources short")
+	fmt.Println("Look for sources ending in '.monitor'")
+	fmt.Println()
+
+	fmt.Println("Method 3: Use pavucontrol")
+	fmt.Println("1. Install: sudo apt install pavucontrol")
+	fmt.Println("2. Run: pavucontrol")
+	fmt.Println("3. Go to Recording tab while visualizer is running")
+	fmt.Println("4. Set it to record from 'Monitor of [your output device]'")
+	fmt.Println()
+
+	fmt.Println("After setup, run the visualizer and play some music to test!")
+}
+
+func testAudioCapture() {
+	fmt.Println("AUDIO CAPTURE TEST")
+	fmt.Println("==================")
+	fmt.Println("This will test if audio capture is working without the full visualizer.")
+	fmt.Println("Press Ctrl+C to stop the test.")
+	fmt.Println()
+
+	tester := NewSimpleAudioTester()
+
+	// Setup signal handling
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Initialize and start
+	err := tester.Initialize()
+	if err != nil {
+		log.Fatalf("Failed to initialize: %v", err)
+	}
+	defer tester.Cleanup()
+
+	err = tester.Start()
+	if err != nil {
+		log.Fatalf("Failed to start: %v", err)
+	}
+
+	// Wait for interrupt
+	<-sigChan
+	fmt.Println("\n\nStopping audio test...")
+	tester.Stop()
+}
+
+type SimpleAudioTester struct {
+	paStream      *portaudio.Stream
+	peakLevel     float64
+	mutex         sync.RWMutex
+	lastAudioTime time.Time
+	running       bool
+}
+
+func NewSimpleAudioTester() *SimpleAudioTester {
+	return &SimpleAudioTester{
+		lastAudioTime: time.Now(),
+	}
+}
+
+func (sat *SimpleAudioTester) audioCallback(inputBuffer [][]float32) {
+	if len(inputBuffer) == 0 {
+		return
+	}
+
+	sat.mutex.Lock()
+	defer sat.mutex.Unlock()
+
+	peak := float64(0)
+	sampleCount := 0
+
+	for _, channel := range inputBuffer {
+		for _, sample := range channel {
+			absSample := math.Abs(float64(sample))
+			if absSample > peak {
+				peak = absSample
+			}
+			sampleCount++
 		}
 	}
 
-	if len(tracks) == 0 {
-		log.Printf("No tracks found in the media directory.")
+	sat.peakLevel = peak
+
+	if peak > 0.0001 {
+		sat.lastAudioTime = time.Now()
 	}
 
-	return tracks
+	// Print real-time audio levels
+	now := time.Now()
+	if peak > 0.01 {
+		fmt.Printf("\r🎵 STRONG: Peak=%.4f | %s", peak, now.Format("15:04:05"))
+	} else if peak > 0.001 {
+		fmt.Printf("\r🔉 Medium: Peak=%.4f | %s", peak, now.Format("15:04:05"))
+	} else if peak > 0.0001 {
+		fmt.Printf("\r🔈 Low: Peak=%.6f | %s", peak, now.Format("15:04:05"))
+	} else {
+		fmt.Printf("\r🔇 Silent: Peak=%.8f | %s", peak, now.Format("15:04:05"))
+	}
 }
 
-func (mp *MusicPlayer) Play() error {
-	mp.playbackLock.Lock()
-	defer mp.playbackLock.Unlock()
+func (sat *SimpleAudioTester) Initialize() error {
+	// First, automatically detect and set the active audio monitor
+	sat.setupCurrentAudioMonitor()
 
-	if mp.isPlaying {
-		if err := mp.Stop(); err != nil {
-			log.Printf("Error stopping current track: %v", err)
+	err := portaudio.Initialize()
+	if err != nil {
+		return fmt.Errorf("failed to initialize PortAudio: %v", err)
+	}
+
+	devices, err := portaudio.Devices()
+	if err != nil {
+		return fmt.Errorf("failed to get audio devices: %v", err)
+	}
+
+	var selectedDevice *portaudio.DeviceInfo
+	for _, device := range devices {
+		if device.MaxInputChannels >= 32 {
+			selectedDevice = device
+			fmt.Printf("Selected: %s (%d channels)\n", device.Name, device.MaxInputChannels)
+			break
 		}
 	}
 
-	if len(mp.tracks) == 0 {
-		return fmt.Errorf("no tracks available to play")
+	if selectedDevice == nil {
+		defaultInput, _ := portaudio.DefaultInputDevice()
+		selectedDevice = defaultInput
+		fmt.Printf("Using default: %s\n", selectedDevice.Name)
 	}
 
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	audioFile := mp.tracks[rng.Intn(len(mp.tracks))]
-	mp.currentTrack = audioFile
+	streamParams := portaudio.StreamParameters{
+		Input: portaudio.StreamDeviceParameters{
+			Device:   selectedDevice,
+			Channels: 2,
+			Latency:  selectedDevice.DefaultLowInputLatency,
+		},
+		SampleRate:      44100,
+		FramesPerBuffer: 1024,
+	}
 
-	f, err := os.Open(audioFile)
+	sat.paStream, err = portaudio.OpenStream(streamParams, sat.audioCallback)
 	if err != nil {
-		return fmt.Errorf("error opening audio file: %v", err)
+		return fmt.Errorf("failed to open audio stream: %v", err)
 	}
 
-	if mp.updateInfoFunc != nil {
-		mp.updateInfoFunc()
-	}
+	return nil
+}
 
-	mp.streamer, mp.format, err = mp3.Decode(f)
+func (sat *SimpleAudioTester) Start() error {
+	err := sat.paStream.Start()
 	if err != nil {
-		return fmt.Errorf("error decoding audio file: %v", err)
+		return fmt.Errorf("failed to start audio stream: %v", err)
+	}
+	sat.running = true
+	fmt.Println("🎤 Listening for audio... (play some music to test)")
+	return nil
+}
+
+func (sat *SimpleAudioTester) Stop() {
+	if sat.paStream != nil && sat.running {
+		sat.paStream.Stop()
+		sat.running = false
+	}
+}
+
+func (sat *SimpleAudioTester) Cleanup() {
+	sat.Stop()
+	if sat.paStream != nil {
+		sat.paStream.Close()
+	}
+	portaudio.Terminate()
+}
+
+func (sat *SimpleAudioTester) setupCurrentAudioMonitor() {
+	fmt.Println("=== AUTO-DETECTING ACTIVE AUDIO OUTPUT ===")
+
+	// Get list of sinks and find the one that's RUNNING
+	cmd := exec.Command("pactl", "list", "sinks", "short")
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("Could not query audio sinks: %v\n", err)
+		return
 	}
 
-	mp.ctrl = &beep.Ctrl{Streamer: mp.streamer, Paused: false}
-	mp.volume = &effects.Volume{
-		Streamer: mp.ctrl,
-		Base:     2,
-		Volume:   0,
-		Silent:   false,
-	}
+	lines := strings.Split(string(output), "\n")
+	var runningSink string
 
-	analyzer := NewPeakAnalyzer(mp.volume)
-
-	speaker.Init(mp.format.SampleRate, mp.format.SampleRate.N(time.Second/10))
-
-	speaker.Play(beep.Seq(analyzer, beep.Callback(func() {
-		mp.done <- true
-	})))
-
-	mp.SetVolume(0)
-
-	mp.isPlaying = true
-	mp.visualizerTicker = time.NewTicker(time.Second / 60)
-
-	select {
-	case mp.stopVisualizer <- true:
-	default:
-	}
-
-	go func() {
-		for {
-			select {
-			case <-mp.stopVisualizer:
-				mp.visualizerTicker.Stop()
-				return
-			case <-mp.visualizerTicker.C:
-				peak := analyzer.Peak
-				mp.visualizer.UpdateWithPeak(peak)
+	for _, line := range lines {
+		if strings.Contains(line, "RUNNING") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				runningSink = parts[1] // Get sink name
+				fmt.Printf("Found active audio sink: %s\n", runningSink)
+				break
 			}
 		}
-	}()
-
-	go func() {
-		<-mp.done
-		mp.Play()
-	}()
-
-	return nil
-}
-
-func (mp *MusicPlayer) Stop() error {
-	if !mp.isPlaying {
-		return fmt.Errorf("not playing")
 	}
-	mp.stopVisualizer <- true
-	if mp.visualizerTicker != nil {
-		mp.visualizerTicker.Stop()
+
+	if runningSink == "" {
+		fmt.Println("No actively running audio sink found")
+		return
 	}
-	speaker.Clear()
-	err := mp.streamer.Close()
+
+	// Set the monitor of the running sink as default source
+	monitorSource := runningSink + ".monitor"
+	cmd = exec.Command("pactl", "set-default-source", monitorSource)
+	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("error stopping playback: %v", err)
+		fmt.Printf("Failed to set monitor source %s: %v\n", monitorSource, err)
+		return
 	}
 
-	mp.isPlaying = false
-	mp.currentTrack = ""
-	return nil
+	fmt.Printf("✅ Auto-configured source: %s\n", monitorSource)
+	fmt.Println("This will capture system audio from your active output")
 }
 
-func (mp *MusicPlayer) Shuffle() error {
-	return mp.Play()
+func showHelp() {
+	fmt.Println("MILKSHAKER VISUALIZER")
+	fmt.Println("====================")
+	fmt.Println()
+	fmt.Println("Usage:")
+	fmt.Println("  go run .                 # Start the visualizer")
+	fmt.Println("  go run . devices         # List available audio devices")
+	fmt.Println("  go run . setup-audio     # Show audio setup instructions")
+	fmt.Println("  go run . test-audio      # Test audio capture without UI")
+	fmt.Println("  go run . help            # Show this help")
+	fmt.Println()
+	fmt.Println("Controls (when running):")
+	fmt.Println("  S         Start/Stop audio capture")
+	fmt.Println("  R         Restart audio capture")
+	fmt.Println("  +/-       Adjust sensitivity")
+	fmt.Println("  D         Show available devices")
+	fmt.Println("  Ctrl+C    Quit")
+	fmt.Println()
+	fmt.Println("For system audio capture on Linux:")
+	fmt.Println("  Run: go run . setup-audio")
 }
 
-func (mp *MusicPlayer) SetVolume(percentage float64) {
-	if mp.volume != nil {
-		percentage = math.Max(-100, math.Min(100, percentage))
-		volume := math.Log2(float64(percentage)/100 + 1)
-		speaker.Lock()
-		mp.volume.Volume = volume
-		speaker.Unlock()
+func AudioPlayerMain() {
+	fmt.Println("🎵 MILKSHAKER VISUALIZER")
+	fmt.Println("=======================")
+	fmt.Println("Initializing audio system...")
+	fmt.Println()
+
+	player := NewAudioPlayer()
+
+	// Initialize audio player with all logging upfront
+	if err := player.Initialize(); err != nil {
+		log.Fatalf("Failed to initialize audio player: %v", err)
 	}
-}
+	defer player.Cleanup()
 
-func (mp *MusicPlayer) GetVolumePercentage() float64 {
-	if mp.volume == nil {
-		return 0
-	}
-	return (math.Pow(2, mp.volume.Volume) - 1) * 100
-}
+	fmt.Println()
+	fmt.Println("✅ Audio system initialized successfully!")
+	fmt.Println("🎤 Starting visualizer...")
+	fmt.Println("Press S to start/stop | +/- for sensitivity | Ctrl+C to quit")
+	fmt.Println()
+	time.Sleep(2 * time.Second) // Give user time to read
 
-func MusicPlayerMain() {
-	player := NewMusicPlayer()
 	app := tview.NewApplication()
 	app.SetAfterDrawFunc(func(screen tcell.Screen) {
 		width, height := screen.Size()
@@ -210,8 +361,8 @@ func MusicPlayerMain() {
 		SetTextAlign(tview.AlignCenter)
 
 	updateInfo := func() {
-		infoTextNowPlaying.SetText(filepath.Base(player.currentTrack))
-		infoTextVolume.SetText(fmt.Sprintf("Volume: %.0f%%", player.GetVolumePercentage()))
+		infoTextNowPlaying.SetText(player.GetCurrentTrack())
+		infoTextVolume.SetText(fmt.Sprintf("Peak: %.0f%% | Sensitivity: %.1fx | Device: %s", player.GetVolumePercentage(), player.GetSensitivity(), player.GetCurrentDeviceName()))
 	}
 
 	visualizer := player.visualizer
@@ -224,8 +375,15 @@ func MusicPlayerMain() {
 
 		tview.Print(screen, infoTextVolume.GetText(true), x, y+1, width, tview.AlignCenter, tcell.ColorWhite)
 
-		tview.Print(screen, "MILKSHAKER PLAYER", x, height-2, width, tview.AlignCenter, tcell.ColorGreen)
-		tview.Print(screen, "S (Shuffle), U/D (Volume), Q (Quit)", x, height-1, width, tview.AlignCenter, tcell.ColorGreenYellow)
+		tview.Print(screen, "MILKSHAKER VISUALIZER", x, height-2, width, tview.AlignCenter, tcell.ColorGreen)
+
+		var statusText string
+		if player.IsCapturing() {
+			statusText = "R (Restart), S (Stop), +/- (Sensitivity), D (Cycle Device), Ctrl+C (Quit)"
+		} else {
+			statusText = "S (Start), +/- (Sensitivity), D (Cycle Device), Ctrl+C (Quit)"
+		}
+		tview.Print(screen, statusText, x, height-1, width, tview.AlignCenter, tcell.ColorGreenYellow)
 
 		return x, y, width, height
 	})
@@ -238,18 +396,30 @@ func MusicPlayerMain() {
 			app.Draw()
 		}
 	}()
+
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
 		case 's', 'S':
-			player.Play()
-		case 'u', 'U':
-			player.SetVolume(player.GetVolumePercentage() + 10)
-		case 'd', 'D':
-			player.SetVolume(player.GetVolumePercentage() - 10)
-		case 'q', 'Q':
-			if err := player.Stop(); err != nil {
-				log.Printf("Error stopping playback: %v", err)
+			if player.IsCapturing() {
+				player.Stop()
+			} else {
+				player.Start()
 			}
+		case 'r', 'R':
+			player.Restart()
+		case '+', '=':
+			player.IncreaseSensitivity()
+		case '-', '_':
+			player.DecreaseSensitivity()
+
+		case 'd', 'D':
+			// Cycle to next audio input device
+			player.CycleDevice()
+		}
+
+		// Handle Ctrl+C for quit
+		if event.Key() == tcell.KeyCtrlC {
+			player.Stop()
 			app.Stop()
 		}
 		updateInfo()
@@ -257,32 +427,8 @@ func MusicPlayerMain() {
 	})
 
 	if err := app.SetRoot(fullScreenVisualizer, true).SetFocus(fullScreenVisualizer).Run(); err != nil {
-		log.Fatalf("Error running application: %v", err)
+		fmt.Printf("\nVisualizer stopped: %v\n", err)
 	}
-}
-
-type PeakAnalyzer struct {
-	Streamer beep.Streamer
-	Peak     float64
-	decay    float64
-}
-
-func NewPeakAnalyzer(streamer beep.Streamer) *PeakAnalyzer {
-	return &PeakAnalyzer{Streamer: streamer, decay: 0.99}
-}
-
-func (a *PeakAnalyzer) Stream(samples [][2]float64) (n int, ok bool) {
-	n, ok = a.Streamer.Stream(samples)
-	a.Peak *= a.decay
-	for i := 0; i < n; i++ {
-		a.Peak = math.Max(a.Peak, math.Abs(samples[i][0]))
-		a.Peak = math.Max(a.Peak, math.Abs(samples[i][1]))
-	}
-	return n, ok
-}
-
-func (a *PeakAnalyzer) Err() error {
-	return nil
 }
 
 type FibonacciVisualizer struct {
