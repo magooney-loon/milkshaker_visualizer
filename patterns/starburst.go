@@ -71,9 +71,9 @@ var (
 	maxSpirals = 12
 
 	// Animation phases
-	explosionPhase      float64 = 0.0
-	lightningPhase      float64 = 0.0
-	spiralPhase         float64 = 0.0
+	explosionPhase float64 = 0.0
+	lightningPhase float64 = 0.0
+	// spiralPhase         float64 = 0.0
 	shockwavePhase      float64 = 0.0
 	starburstLastUpdate time.Time
 

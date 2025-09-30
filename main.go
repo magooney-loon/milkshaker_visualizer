@@ -209,10 +209,14 @@ func AudioPlayerMain() {
 	updateInfo := func() {
 		shuffleStatus := ""
 		if patternManager.IsShuffleEnabled() {
-			shuffleStatus = " | SHUFFLE: ON"
+			shuffleStatus = ""
 		}
 		infoTextNowPlaying.SetText(fmt.Sprintf("Peak: %.0f%% | Sensitivity: %.1fx | Device: %s%s", player.GetVolumePercentage(), player.GetSensitivity(), player.GetCurrentDeviceName(), shuffleStatus))
-		infoTextVolume.SetText(fmt.Sprintf("Visualizator: %s (%d/%d)", patternManager.GetCurrentVisualizatorName(), patternManager.GetCurrentVisualizatorIndex()+1, patternManager.GetVisualizatorCount()))
+		visualizerName := patternManager.GetCurrentVisualizatorName()
+		if patternManager.IsShuffleEnabled() {
+			visualizerName = "SHUFFLE"
+		}
+		infoTextVolume.SetText(fmt.Sprintf("Visualizator: %s (%d/%d)", visualizerName, patternManager.GetCurrentVisualizatorIndex()+1, patternManager.GetVisualizatorCount()))
 	}
 
 	player.SetUpdateInfoFunc(updateInfo)
@@ -229,7 +233,7 @@ func AudioPlayerMain() {
 		tview.Print(screen, infoTextNowPlaying.GetText(true), x, y, width, tview.AlignCenter, tcell.ColorWhite)
 		tview.Print(screen, infoTextVolume.GetText(true), x, y+1, width, tview.AlignCenter, tcell.ColorWhite)
 
-		statusText := "R (Restart), +/- (Sensitivity), D (Cycle Device), P (Cycle Patterns), X (Shuffle), Ctrl+C (Quit)"
+		statusText := "R (Restart), +/- (Sensitivity), D (Device), P (Patterns), X (Shuffle), Ctrl+C (Quit)"
 		tview.Print(screen, statusText, x, height-1, width, tview.AlignCenter, tcell.ColorGreenYellow)
 
 		return x, y, width, height
