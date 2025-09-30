@@ -2,6 +2,8 @@
 
 A real-time audio visualizer that responds to system audio or microphone input.
 
+DEMO VIDEO: https://youtu.be/qguHrVe7_T4
+
 ## Controls
 - `S`: Start/Stop audio capture
 - `R`: Restart audio capture
