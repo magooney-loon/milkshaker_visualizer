@@ -27,7 +27,7 @@ type Player struct {
 // NewPlayer creates a new audio player
 func NewPlayer() *Player {
 	return &Player{
-		sensitivity:   1.8,
+		sensitivity:   1.3,
 		lastAudioTime: time.Now(),
 	}
 }

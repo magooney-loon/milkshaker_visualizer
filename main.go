@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"time"
 
@@ -167,7 +168,6 @@ func showHelp() {
 	fmt.Println("  go run . help            # Show this help")
 	fmt.Println()
 	fmt.Println("Controls (when running):")
-	fmt.Println("  S         Start/Stop audio capture")
 	fmt.Println("  R         Restart audio capture")
 	fmt.Println("  +/-       Adjust sensitivity")
 	fmt.Println("  D         Show available devices")
@@ -185,12 +185,17 @@ func AudioPlayerMain() {
 	}
 	defer player.Cleanup()
 
+	// Start audio capture automatically
+	if err := player.Start(); err != nil {
+		log.Fatalf("Failed to start audio capture: %v", err)
+	}
+
+	// Create pattern manager
+	patternManager := patterns.NewManager()
+
 	app := tview.NewApplication()
-	visualizer := patterns.NewFibonacciVisualizer()
 
 	app.SetAfterDrawFunc(func(screen tcell.Screen) {
-		width, height := screen.Size()
-		visualizer.SetRect(0, 0, width, height)
 	})
 
 	infoTextNowPlaying := tview.NewTextView().
@@ -202,31 +207,29 @@ func AudioPlayerMain() {
 		SetTextAlign(tview.AlignCenter)
 
 	updateInfo := func() {
-		// infoTextVolume.SetText(player.GetCurrentTrack())
-		infoTextNowPlaying.SetText(fmt.Sprintf("Peak: %.0f%% | Sensitivity: %.1fx | Device: %s", player.GetVolumePercentage(), player.GetSensitivity(), player.GetCurrentDeviceName()))
+		shuffleStatus := ""
+		if patternManager.IsShuffleEnabled() {
+			shuffleStatus = " | SHUFFLE: ON"
+		}
+		infoTextNowPlaying.SetText(fmt.Sprintf("Peak: %.0f%% | Sensitivity: %.1fx | Device: %s%s", player.GetVolumePercentage(), player.GetSensitivity(), player.GetCurrentDeviceName(), shuffleStatus))
+		infoTextVolume.SetText(fmt.Sprintf("Visualizator: %s (%d/%d)", patternManager.GetCurrentVisualizatorName(), patternManager.GetCurrentVisualizatorIndex()+1, patternManager.GetVisualizatorCount()))
 	}
 
 	player.SetUpdateInfoFunc(updateInfo)
 	fullScreenVisualizer := tview.NewBox().SetDrawFunc(func(screen tcell.Screen, x, y, width, height int) (int, int, int, int) {
-		visualizer.SetRect(x, y, width, height)
-
-		// Update visualizer with current audio peak
+		// Get current audio peak
 		peak := player.GetPeakLevel()
-		visualizer.UpdateWithPeak(peak)
 
-		visualizer.Draw(screen)
+		// Create RNG for patterns
+		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+		// Draw current visualizator patterns
+		patternManager.DrawCurrentVisualizator(screen, tcell.ColorWhite, rng, peak)
+
 		tview.Print(screen, infoTextNowPlaying.GetText(true), x, y, width, tview.AlignCenter, tcell.ColorWhite)
-
 		tview.Print(screen, infoTextVolume.GetText(true), x, y+1, width, tview.AlignCenter, tcell.ColorWhite)
 
-		// tview.Print(screen, "MILKSHAKER VISUALIZER", x, height-2, width, tview.AlignCenter, tcell.ColorGreen)
-
-		var statusText string
-		if player.IsCapturing() {
-			statusText = "R (Restart), S (Stop), +/- (Sensitivity), D (Cycle Device), Ctrl+C (Quit)"
-		} else {
-			statusText = "S (Start), +/- (Sensitivity), D (Cycle Device), Ctrl+C (Quit)"
-		}
+		statusText := "R (Restart), +/- (Sensitivity), D (Cycle Device), P (Cycle Patterns), X (Shuffle), Ctrl+C (Quit)"
 		tview.Print(screen, statusText, x, height-1, width, tview.AlignCenter, tcell.ColorGreenYellow)
 
 		return x, y, width, height
@@ -243,22 +246,26 @@ func AudioPlayerMain() {
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
-		case 's', 'S':
-			if player.IsCapturing() {
-				player.Stop()
-			} else {
-				player.Start()
-			}
 		case 'r', 'R':
 			player.Restart()
 		case '+', '=':
 			player.IncreaseSensitivity()
 		case '-', '_':
 			player.DecreaseSensitivity()
-
 		case 'd', 'D':
 			// Cycle to next audio input device
 			player.CycleDevice()
+		case 'p', 'P':
+			// Cycle to next visualizator
+			patternManager.CycleVisualizator()
+		case 'x', 'X':
+			// Toggle shuffle or shuffle current visualizator
+			if patternManager.IsShuffleEnabled() {
+				patternManager.ToggleShuffle() // Turn off shuffle
+			} else {
+				patternManager.ToggleShuffle()              // Turn on shuffle
+				patternManager.ShuffleCurrentVisualizator() // Do immediate shuffle
+			}
 		}
 
 		// Handle Ctrl+C for quit

@@ -7,303 +7,235 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
-// DrawStarburst creates organic, flowing rays with 3D depth and perspective effects
+// DrawStarburst creates a retro terminal CLI-style starburst with ASCII line art
 func DrawStarburst(screen tcell.Screen, width, height int, color tcell.Color, char rune, rng *rand.Rand, peak float64) {
 	centerX, centerY := width/2, height/2
 	basePhase := GetBasePhase()
-	maxRadius := math.Sqrt(float64(width*width+height*height)) / 1.8 // Expand to use full screen space
+	maxRadius := math.Min(float64(width), float64(height)) / 2.2
 
-	goldenAngle := math.Pi * (3 - math.Sqrt(5))
-	goldenRatio := (1 + math.Sqrt(5)) / 2
+	// Clean peak scaling for terminal feel
+	peakScale := 0.3 + peak*0.7 // Always 30% visible, scales to 100%
 
-	// 3D depth layers - create multiple Z planes
-	numDepthLayers := 3 + int(peak*3)
-	if numDepthLayers > 6 {
-		numDepthLayers = 6
+	// Number of primary rays - classic 8-way plus extras
+	baseRays := 8
+	extraRays := int(peak * 8) // Add more rays at high peaks
+	totalRays := baseRays + extraRays
+	if totalRays > 20 {
+		totalRays = 20
 	}
 
-	// Process each depth layer from back to front for proper 3D layering
-	for depthLayer := numDepthLayers - 1; depthLayer >= 0; depthLayer-- {
-		depthRatio := float64(depthLayer) / float64(numDepthLayers-1)
+	// Terminal-style ray characters for different directions
+	rayChars := map[string]rune{
+		"horizontal": '─',
+		"vertical":   '│',
+		"diag1":      '╱',
+		"diag2":      '╲',
+		"thick_h":    '━',
+		"thick_v":    '┃',
+		"dot":        '·',
+		"bullet":     '•',
+		"star":       '★',
+		"plus":       '+',
+		"x":          '×',
+	}
 
-		// 3D perspective effects - expand coverage
-		perspectiveScale := 0.6 + depthRatio*0.7 // Back layers smaller but more expanded
-		depthMaxRadius := maxRadius * perspectiveScale
+	// Draw primary rays
+	for rayIndex := 0; rayIndex < totalRays; rayIndex++ {
+		rayAngle := float64(rayIndex) * 2 * math.Pi / float64(totalRays)
 
-		// 3D Z-axis rotation and movement
-		zRotation := basePhase * (0.2 + depthRatio*0.3) * (1 - 2*float64(depthLayer%2))
-		zBobbing := math.Sin(basePhase*1.5+float64(depthLayer)*goldenAngle) * 0.1
+		// Add some rotation for movement
+		rotation := basePhase * 0.1 * (1 - 2*float64(rayIndex%2)) // Alternate directions
+		finalAngle := rayAngle + rotation
 
-		// Depth-based phase offset for parallax
-		depthPhase := basePhase * (0.8 + depthRatio*0.4)
+		// Ray length based on peak with some individual variation
+		rayPersonality := float64(rayIndex) * 1.618 // Golden ratio for variation
+		lengthVariation := 0.8 + 0.4*math.Sin(basePhase*0.3+rayPersonality)
+		rayLength := maxRadius * peakScale * lengthVariation
 
-		// Organic number of rays per depth layer - slightly more prominent
-		baseRays := 5 + depthLayer
-		dynamicRays := int(peak * (7 + float64(depthLayer)*2))
-		numRays := baseRays + dynamicRays
-		if numRays > 14+depthLayer*2 {
-			numRays = 14 + depthLayer*2
+		// Determine ray character based on angle
+		var rayChar rune
+		normalizedAngle := math.Mod(finalAngle, 2*math.Pi)
+
+		if (normalizedAngle > -math.Pi/8 && normalizedAngle <= math.Pi/8) ||
+			(normalizedAngle > 7*math.Pi/8 || normalizedAngle <= -7*math.Pi/8) {
+			rayChar = rayChars["horizontal"]
+		} else if normalizedAngle > 3*math.Pi/8 && normalizedAngle <= 5*math.Pi/8 {
+			rayChar = rayChars["vertical"]
+		} else if normalizedAngle > math.Pi/8 && normalizedAngle <= 3*math.Pi/8 {
+			rayChar = rayChars["diag1"]
+		} else if normalizedAngle > 5*math.Pi/8 && normalizedAngle <= 7*math.Pi/8 {
+			rayChar = rayChars["diag2"]
+		} else if normalizedAngle > -3*math.Pi/8 && normalizedAngle <= -math.Pi/8 {
+			rayChar = rayChars["diag2"]
+		} else {
+			rayChar = rayChars["diag1"]
 		}
 
-		// 3D character sets based on depth
-		var chars []rune
-		if depthLayer < 2 { // Foreground layers
-			chars = []rune{'●', '◉', '⬢', '⬡', '◆', '✧', '✦', '∙', '•', '◦', '○'}
-		} else if depthLayer < 4 { // Mid layers
-			chars = []rune{'◦', '○', '⋅', '∘', '·', '˙', '°', '⁘', '⁛', '⁝'}
-		} else { // Background layers
-			chars = []rune{'⋅', '·', '˙', '∘', '◦'}
-		}
-
-		for rayIndex := 0; rayIndex < numRays; rayIndex++ {
-			// 3D organic ray distribution
-			baseAngle := float64(rayIndex) * goldenAngle * (2.1 + depthRatio*0.3)
-
-			// 3D rotation with depth influence
-			rotationDirection := float64(1-2*(rayIndex%2)) * (1 - depthRatio*0.3)
-			rayPhaseSpeed := (0.3 + float64(rayIndex%4)*0.1) * (0.7 + depthRatio*0.6)
-
-			// 3D ray personality with depth variation
-			rayPersonality := float64(rayIndex)*goldenRatio + float64(depthLayer)*1.7
-			rayPhase := depthPhase * rayPhaseSpeed * rotationDirection
-
-			// 3D starting angle with Z-axis influence
-			organicStartAngle := baseAngle + rayPhase + zRotation +
-				math.Sin(depthPhase*0.7+rayPersonality)*0.3*perspectiveScale
-
-			// 3D ray characteristics scaled by depth
-			rayAmplitude := peak * (0.5 + float64(rayIndex%3)*0.15) * perspectiveScale
-			rayFrequency := (0.25 + float64(rayIndex)*0.02 + peak*0.06) * (1 + depthRatio*0.2)
-
-			// Multiple 3D beam layers per ray
-			numBeams := 1 + int(peak*1.5*(0.8+depthRatio*0.4))
-			if numBeams > 3 {
-				numBeams = 3
-			}
-
-			for beam := 0; beam < numBeams; beam++ {
-				beamPhase := depthPhase * (0.4 + float64(beam)*0.15)
-				beamPersonality := rayPersonality + float64(beam)*1.3
-
-				// 3D beam offset with depth perspective
-				beamDepthOffset := float64(beam-1) * 0.1 * perspectiveScale
-
-				// 3D curved ray path with depth segments - expand segments for fuller coverage
-				maxSegments := int(depthMaxRadius / (1.5 + depthRatio*0.5))
-
-				for segment := 0; segment < maxSegments; segment++ {
-					segmentRatio := float64(segment) / float64(maxSegments)
-
-					// 3D base radius with perspective - start from minimum radius to avoid center density
-					minRadius := depthMaxRadius * 0.12
-					baseRadius := minRadius + segmentRatio*(depthMaxRadius-minRadius)*(0.9+peak*0.4)
-
-					// 3D length variation with Z-axis influence
-					lengthVariation := 0.9 + 0.4*math.Sin(beamPhase*1.8+rayPersonality+segmentRatio*3+zBobbing*2)
-					currentRadius := baseRadius * lengthVariation
-
-					if currentRadius < 1 || currentRadius > depthMaxRadius {
-						continue
-					}
-
-					// 3D CURVED RAY PATH with depth influence
-					curvePhase := currentRadius * (0.04 + depthRatio*0.01)
-
-					// 3D primary curve - main flow with Z-axis influence
-					primaryCurve := rayAmplitude * 0.8 * math.Sin(curvePhase*rayFrequency+beamPhase*1.5+rayPersonality+zBobbing)
-
-					// 3D secondary curve - depth complexity
-					secondaryCurve := rayAmplitude * 0.4 * math.Cos(curvePhase*rayFrequency*1.6+beamPhase*1.2+rayPersonality*0.7+zRotation*0.5)
-
-					// 3D tertiary curve - micro Z variations
-					tertiaryCurve := rayAmplitude * 0.2 * math.Sin(curvePhase*rayFrequency*2.3+beamPhase*2.0+rayPersonality*0.4+zBobbing*3)
-
-					// Combined 3D curvature
-					totalCurvature := primaryCurve + secondaryCurve + tertiaryCurve
-
-					// Safety check
-					if math.IsNaN(totalCurvature) || math.IsInf(totalCurvature, 0) {
-						totalCurvature = 0
-					}
-
-					// 3D organic angle calculation with depth rotation
-					baseCurvedAngle := organicStartAngle + totalCurvature*0.15*perspectiveScale
-
-					// 3D flowing variations with depth influence
-					flowVariation := math.Sin(beamPhase*0.6+currentRadius*0.03+rayPersonality+zRotation) * 0.08
-					organicFlow := math.Cos(beamPhase*0.9+currentRadius*0.05+beamPersonality+zBobbing*2) * 0.05
-					depthAngleShift := depthRatio * math.Sin(depthPhase*0.4+rayPersonality) * 0.1
-
-					finalAngle := baseCurvedAngle + flowVariation + organicFlow + depthAngleShift
-
-					// 3D breathing radius with depth perspective
-					breathe := 1 + 0.05*math.Sin(beamPhase*1.7+rayPersonality+currentRadius*0.02+zBobbing*4)*perspectiveScale
-					finalRadius := currentRadius * breathe
-
-					// 3D micro-positioning with depth parallax
-					microX := (0.3*math.Sin(beamPhase*3.2+currentRadius*0.08) + beamDepthOffset) * perspectiveScale
-					microY := (0.3*math.Cos(beamPhase*3.7+currentRadius*0.09) + zBobbing*2) * perspectiveScale
-
-					x := centerX + int(finalRadius*math.Cos(finalAngle)+microX)
-					y := centerY + int(finalRadius*math.Sin(finalAngle)+microY)
-
-					// Bounds check
-					if x >= 0 && x < width && y >= 0 && y < height {
-						// 3D character selection based on depth and flow
-						// Calculate starburst intensity for intelligent character fading
-						starburstIntensity := peak * (1.0 - currentRadius/depthMaxRadius*0.7) * perspectiveScale * (0.4 + math.Abs(totalCurvature)*0.6)
-
-						// Character selection
-						charPhase := rayPersonality + currentRadius*0.12 + totalCurvature*0.3 +
-							float64(beam)*1.8 + float64(depthLayer)*2.5
-						if math.IsNaN(charPhase) || math.IsInf(charPhase, 0) {
-							charPhase = 0
-						}
-						charIndex := int(math.Abs(charPhase)*goldenRatio) % len(chars)
-						baseRayChar := chars[charIndex]
-
-						// Intelligent character fading based on intensity - more visible
-						var rayChar rune
-						if starburstIntensity < 0.08 {
-							rayChar = '·' // Barely visible dot
-						} else if starburstIntensity < 0.18 {
-							rayChar = '˙' // Small dot
-						} else if starburstIntensity < 0.3 {
-							rayChar = '∘' // Circle outline
-						} else if starburstIntensity < 0.45 {
-							rayChar = '◦' // Larger circle
-						} else if starburstIntensity < 0.65 {
-							rayChar = '●' // Filled circle
-						} else {
-							rayChar = baseRayChar // Full character set
-						}
-
-						// 3D color with depth-based hues and perspective
-						colorPhase := rayPersonality*0.3 + currentRadius*0.006 + beamPhase*0.1 +
-							totalCurvature*0.02 + float64(depthLayer)*0.15
-						hue := math.Mod(colorPhase, 1)
-
-						// 3D saturation with depth attenuation - enhanced
-						saturation := (0.5 + peak*0.35 + math.Abs(totalCurvature)*0.12 - currentRadius/(depthMaxRadius*2.8)) *
-							(0.65 + depthRatio*0.45)
-						saturation = math.Max(0.15, math.Min(0.85, saturation))
-
-						// 3D brightness with depth-based dimming
-						baseValue := (0.7 - currentRadius/depthMaxRadius*0.25) * (0.4 + depthRatio*0.6)
-						valueFlow := math.Sin(beamPhase*1.1+currentRadius*0.06) * 0.1 * perspectiveScale
-						depthDimming := 1.0 - (1.0-depthRatio)*0.4 // Back layers dimmer
-						value := (baseValue + peak*0.25 + valueFlow + math.Abs(totalCurvature)*0.06) * depthDimming
-						value = math.Max(0.2, math.Min(0.95, value))
-
-						rayColor := HSVToRGB(hue, saturation, value)
-
-						// Additional fading for very weak areas and depth transparency
-						distanceRatio := currentRadius / depthMaxRadius
-
-						if distanceRatio > 0.85 || peak < 0.12 || starburstIntensity < 0.06 {
-							rayChar = '·'
-						}
-
-						screen.SetContent(x, y, rayChar, nil, tcell.StyleDefault.Foreground(rayColor))
-
-						// 3D organic curved branching at flow peaks
-						if math.Abs(totalCurvature) > rayAmplitude*0.6 && peak > 0.4 && beam == 0 &&
-							segment%(3+depthLayer) == 0 && depthLayer < 3 { // Less branching in back layers
-							draw3DOrganicStarburstBranch(screen, x, y, finalAngle, totalCurvature, rayColor,
-								peak, rayIndex, depthLayer, perspectiveScale, width, height)
-						}
-					}
-				}
+		// Use thicker characters for high peaks
+		if peak > 0.7 {
+			if rayChar == rayChars["horizontal"] {
+				rayChar = rayChars["thick_h"]
+			} else if rayChar == rayChars["vertical"] {
+				rayChar = rayChars["thick_v"]
 			}
 		}
-	}
-}
 
-// draw3DOrganicStarburstBranch creates 3D flowing, curved branches with depth effects
-func draw3DOrganicStarburstBranch(screen tcell.Screen, x, y int, baseAngle, curvature float64, color tcell.Color,
-	amplitude float64, rayIndex, depthLayer int, perspectiveScale float64, width, height int) {
+		// Draw ray segments
+		raySteps := int(rayLength / 1.5)
+		if raySteps < 3 {
+			raySteps = 3
+		}
 
-	branchChars := []rune{'·', '˙', '∘', '◦', '⋅'}
-	goldenRatio := (1 + math.Sqrt(5)) / 2
-	goldenAngle := math.Pi * (3 - math.Sqrt(5))
-	basePhase := GetBasePhase()
+		for step := 1; step <= raySteps; step++ {
+			stepRatio := float64(step) / float64(raySteps)
+			currentRadius := stepRatio * rayLength
 
-	// 3D branch characteristics scaled by depth
-	branchLength := int(float64(2+int(amplitude*3)) * perspectiveScale)
-	if branchLength > 5 {
-		branchLength = 5
-	}
-	if branchLength < 1 {
-		branchLength = 1
-	}
+			if currentRadius < 2 {
+				continue
+			}
 
-	// 3D multiple organic branches with depth variation
-	numBranches := 1 + int(amplitude*1.5*perspectiveScale)
-	if numBranches > 3 {
-		numBranches = 3
-	}
-	if numBranches < 1 {
-		numBranches = 1
-	}
+			x := centerX + int(currentRadius*math.Cos(finalAngle))
+			y := centerY + int(currentRadius*math.Sin(finalAngle))
 
-	for branch := 0; branch < numBranches; branch++ {
-		branchPersonality := float64(rayIndex)*goldenRatio + float64(branch)*2.1 + float64(depthLayer)*1.3
+			if x >= 0 && x < width && y >= 0 && y < height {
+				// Distance-based intensity
+				intensity := (1.0 - stepRatio*0.8) * peakScale
 
-		// 3D branch angle influenced by main ray curvature and depth
-		curvatureInfluence := curvature * 0.4 * perspectiveScale
-		branchBaseAngle := baseAngle + curvatureInfluence
-
-		// 3D organic branch angle variations with depth influence
-		branchOffset := (float64(branch) - float64(numBranches)/2 + 0.5) * 0.6 * perspectiveScale
-		organicVariation := math.Sin(basePhase*1.4+branchPersonality) * 0.25 * perspectiveScale
-		depthAngleVariation := float64(depthLayer) * 0.1 * math.Cos(basePhase*0.8+branchPersonality)
-
-		startAngle := branchBaseAngle + branchOffset + organicVariation + depthAngleVariation
-
-		for step := 1; step <= branchLength; step++ {
-			stepRatio := float64(step) / float64(branchLength)
-
-			// 3D organic branch curve that flows with the main ray and depth
-			branchCurve := math.Sin(stepRatio*math.Pi*1.5+branchPersonality) * 0.4 * perspectiveScale
-			organicBend := math.Cos(basePhase*2.1+branchPersonality+stepRatio*2) * 0.2 * perspectiveScale
-			depthCurve := math.Sin(basePhase*1.0+float64(depthLayer)*goldenAngle+stepRatio*1.5) * 0.1
-
-			// 3D branch angle curves organically with depth influence
-			currentAngle := startAngle + branchCurve + organicBend + depthCurve
-
-			// 3D organic branch radius with flowing variations and perspective
-			baseRadius := float64(step) * (0.7 + math.Sin(stepRatio*math.Pi)*0.3) * perspectiveScale
-			radiusFlow := 1 + 0.1*math.Sin(basePhase*2.5+branchPersonality+stepRatio*3)*perspectiveScale
-			branchRadius := baseRadius * radiusFlow
-
-			branchX := x + int(branchRadius*math.Cos(currentAngle))
-			branchY := y + int(branchRadius*math.Sin(currentAngle))
-
-			if branchX >= 0 && branchX < width && branchY >= 0 && branchY < height {
-				charIndex := (step + branch + rayIndex + depthLayer) % len(branchChars)
-				baseBranchChar := branchChars[charIndex]
-
-				// Calculate branch intensity for intelligent character fading
-				flowIntensity := 1.0 + math.Abs(branchCurve)*0.5
-				depthAttenuation := 0.4 + float64(depthLayer)/6.0*0.6 // Back layers dimmer
-				branchIntensity := (1.0 - stepRatio*0.7) * flowIntensity * goldenRatio * 0.4 *
-					perspectiveScale * depthAttenuation * amplitude
-
-				// Intelligent character fading for branches
-				var branchChar rune
-				if branchIntensity < 0.1 {
-					branchChar = '·'
-				} else if branchIntensity < 0.2 {
-					branchChar = '˙'
-				} else if branchIntensity < 0.35 {
-					branchChar = '∘'
+				// Character progression based on intensity and distance
+				var finalChar rune
+				if intensity < 0.2 {
+					finalChar = rayChars["dot"]
+				} else if intensity < 0.4 {
+					finalChar = rayChars["bullet"]
+				} else if step == raySteps && intensity > 0.6 {
+					finalChar = rayChars["star"] // Star at ray tips
 				} else {
-					branchChar = baseBranchChar
+					finalChar = rayChar
 				}
 
-				// Only render if branch intensity is above threshold
-				if branchIntensity > 0.08 {
-					screen.SetContent(branchX, branchY, branchChar, nil, tcell.StyleDefault.Foreground(color))
+				// Terminal-style colors
+				hue := math.Mod(float64(rayIndex)*0.1+basePhase*0.05, 1)
+				saturation := 0.6 + peak*0.3
+				brightness := 0.4 + intensity*0.5
+
+				rayColor := HSVToRGB(hue, saturation, brightness)
+				screen.SetContent(x, y, finalChar, nil, tcell.StyleDefault.Foreground(rayColor))
+			}
+		}
+	}
+
+	// Draw center core
+	coreRadius := 1 + int(peak*3)
+	if coreRadius > 4 {
+		coreRadius = 4
+	}
+
+	coreChars := []rune{'○', '●', '◉', '⬢', '★'}
+
+	for radius := 0; radius <= coreRadius; radius++ {
+		if radius == 0 {
+			// Center point
+			coreIntensity := 0.5 + peak*0.5
+			charIndex := int(coreIntensity * float64(len(coreChars)-1))
+			if charIndex >= len(coreChars) {
+				charIndex = len(coreChars) - 1
+			}
+			coreChar := coreChars[charIndex]
+
+			coreHue := math.Mod(basePhase*0.03, 1)
+			coreColor := HSVToRGB(coreHue, 0.8, 0.7+peak*0.3)
+			screen.SetContent(centerX, centerY, coreChar, nil, tcell.StyleDefault.Foreground(coreColor))
+		} else {
+			// Core rings
+			intensity := (1.0 - float64(radius)/float64(coreRadius)) * peak * 0.8
+			if intensity > 0.2 {
+				points := radius * 6 // 6 points per radius
+				for i := 0; i < points; i++ {
+					angle := float64(i) * 2 * math.Pi / float64(points)
+					x := centerX + int(float64(radius)*math.Cos(angle))
+					y := centerY + int(float64(radius)*math.Sin(angle))
+
+					if x >= 0 && x < width && y >= 0 && y < height {
+						var ringChar rune
+						if intensity > 0.6 {
+							ringChar = '●'
+						} else if intensity > 0.4 {
+							ringChar = '◦'
+						} else {
+							ringChar = '∘'
+						}
+
+						ringHue := math.Mod(basePhase*0.02, 1)
+						ringColor := HSVToRGB(ringHue, 0.7, intensity)
+						screen.SetContent(x, y, ringChar, nil, tcell.StyleDefault.Foreground(ringColor))
+					}
+				}
+			}
+		}
+	}
+
+	// Add secondary rays between main rays at high peaks
+	if peak > 0.5 && totalRays >= 8 {
+		secondaryRays := totalRays / 2
+		for rayIndex := 0; rayIndex < secondaryRays; rayIndex++ {
+			rayAngle := (float64(rayIndex) + 0.5) * 2 * math.Pi / float64(totalRays)
+			rotation := basePhase * 0.05
+			finalAngle := rayAngle + rotation
+
+			secondaryLength := maxRadius * peakScale * 0.6 // Shorter than main rays
+			raySteps := int(secondaryLength / 2.0)
+
+			for step := 1; step <= raySteps; step++ {
+				stepRatio := float64(step) / float64(raySteps)
+				currentRadius := stepRatio * secondaryLength
+
+				if currentRadius < 3 {
+					continue
+				}
+
+				x := centerX + int(currentRadius*math.Cos(finalAngle))
+				y := centerY + int(currentRadius*math.Sin(finalAngle))
+
+				if x >= 0 && x < width && y >= 0 && y < height {
+					intensity := (1.0 - stepRatio*0.9) * (peak - 0.5) * 2 // Only visible above 50% peak
+
+					if intensity > 0.3 {
+						secondaryChar := rayChars["dot"]
+						if intensity > 0.6 {
+							secondaryChar = rayChars["bullet"]
+						}
+
+						secondaryHue := math.Mod(float64(rayIndex)*0.15+basePhase*0.03, 1)
+						secondaryColor := HSVToRGB(secondaryHue, 0.5, intensity*0.7)
+						screen.SetContent(x, y, secondaryChar, nil, tcell.StyleDefault.Foreground(secondaryColor))
+					}
+				}
+			}
+		}
+	}
+
+	// Terminal-style border effect at very high peaks
+	if peak > 0.8 {
+		borderRadius := int(maxRadius * 0.9)
+		borderPoints := borderRadius * 4 // Sparse border
+
+		for i := 0; i < borderPoints; i++ {
+			angle := float64(i) * 2 * math.Pi / float64(borderPoints)
+			x := centerX + int(float64(borderRadius)*math.Cos(angle))
+			y := centerY + int(float64(borderRadius)*math.Sin(angle))
+
+			if x >= 0 && x < width && y >= 0 && y < height {
+				borderIntensity := (peak - 0.8) * 5 // Scale from 0 to 1 when peak is 0.8 to 1.0
+
+				if borderIntensity > 0.5 && rng.Float64() < 0.3 { // Sparse, random border
+					borderChar := rayChars["plus"]
+					if borderIntensity > 0.8 {
+						borderChar = rayChars["x"]
+					}
+
+					borderHue := math.Mod(basePhase*0.08, 1)
+					borderColor := HSVToRGB(borderHue, 0.9, borderIntensity)
+					screen.SetContent(x, y, borderChar, nil, tcell.StyleDefault.Foreground(borderColor))
 				}
 			}
 		}
