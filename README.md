@@ -5,17 +5,17 @@ A real-time audio visualizer that responds to system audio or microphone input.
 DEMO VIDEO: https://youtu.be/qguHrVe7_T4
 
 ## Controls
-- `S`: Start/Stop audio capture
 - `R`: Restart audio capture
-- `M`: Toggle between Live and Demo mode
 - `+/-`: Increase/Decrease sensitivity
 - `D`: Cycle audio I/O
+- `P`: Cycle visualizors
+- `X`: Random visualizor
 - `Ctrl+C`: Quit
 
 ### Audio Issues on Linux
 - Check if PulseAudio/PipeWire is running: `systemctl --user status pulseaudio`
 - Monitor sources may be suspended - start playing audio to activate them
-- Some systems require explicit loopback setup (see setup instructions above)
+- Some systems require explicit loopback setup, run the binary with --help flag
 
 ### Build Errors
 If you get PortAudio build errors:
@@ -35,7 +35,3 @@ If you get PortAudio build errors:
 ## License
 
 MIT License
-
-
-
-![extras](https://github.com/user-attachments/assets/dbd8940f-a651-446d-98ec-7bb7fe7a4872)
