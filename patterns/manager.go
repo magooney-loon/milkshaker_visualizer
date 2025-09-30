@@ -18,6 +18,7 @@ func NewManager() *Manager {
 			DrawField,
 			DrawSpiral,
 			DrawStarburst,
+			DrawGeometry,
 			DrawLogo,
 		},
 	}

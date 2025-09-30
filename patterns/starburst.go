@@ -11,7 +11,7 @@ import (
 func DrawStarburst(screen tcell.Screen, width, height int, color tcell.Color, char rune, rng *rand.Rand, peak float64) {
 	centerX, centerY := width/2, height/2
 	basePhase := GetBasePhase()
-	maxRadius := float64(Min(width, height)) / 2.8
+	maxRadius := math.Sqrt(float64(width*width+height*height)) / 1.8 // Expand to use full screen space
 
 	goldenAngle := math.Pi * (3 - math.Sqrt(5))
 	goldenRatio := (1 + math.Sqrt(5)) / 2
@@ -26,8 +26,8 @@ func DrawStarburst(screen tcell.Screen, width, height int, color tcell.Color, ch
 	for depthLayer := numDepthLayers - 1; depthLayer >= 0; depthLayer-- {
 		depthRatio := float64(depthLayer) / float64(numDepthLayers-1)
 
-		// 3D perspective effects
-		perspectiveScale := 0.4 + depthRatio*0.8 // Back layers smaller
+		// 3D perspective effects - expand coverage
+		perspectiveScale := 0.6 + depthRatio*0.7 // Back layers smaller but more expanded
 		depthMaxRadius := maxRadius * perspectiveScale
 
 		// 3D Z-axis rotation and movement
@@ -88,14 +88,15 @@ func DrawStarburst(screen tcell.Screen, width, height int, color tcell.Color, ch
 				// 3D beam offset with depth perspective
 				beamDepthOffset := float64(beam-1) * 0.1 * perspectiveScale
 
-				// 3D curved ray path with depth segments
-				maxSegments := int(depthMaxRadius / (2.0 + depthRatio))
+				// 3D curved ray path with depth segments - expand segments for fuller coverage
+				maxSegments := int(depthMaxRadius / (1.5 + depthRatio*0.5))
 
 				for segment := 0; segment < maxSegments; segment++ {
 					segmentRatio := float64(segment) / float64(maxSegments)
 
-					// 3D base radius with perspective
-					baseRadius := segmentRatio * depthMaxRadius * (0.8 + peak*0.3)
+					// 3D base radius with perspective - start from minimum radius to avoid center density
+					minRadius := depthMaxRadius * 0.12
+					baseRadius := minRadius + segmentRatio*(depthMaxRadius-minRadius)*(0.9+peak*0.4)
 
 					// 3D length variation with Z-axis influence
 					lengthVariation := 0.9 + 0.4*math.Sin(beamPhase*1.8+rayPersonality+segmentRatio*3+zBobbing*2)

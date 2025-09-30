@@ -11,7 +11,7 @@ import (
 func DrawSpiral(screen tcell.Screen, width, height int, color tcell.Color, char rune, rng *rand.Rand, peak float64) {
 	centerX, centerY := width/2, height/2
 	basePhase := GetBasePhase()
-	maxRadius := float64(Min(width, height)) / 2.5
+	maxRadius := math.Sqrt(float64(width*width+height*height)) / 1.8 // Expand to use more screen space
 
 	// 3D depth layers for organic flows
 	numDepthLayers := 3 + int(peak*2)
@@ -87,7 +87,9 @@ func drawOrganicFlows(screen tcell.Screen, centerX, centerY int, maxRadius, phas
 
 		for step := 0; step < stepCount; step++ {
 			stepRatio := float64(step) / float64(stepCount)
-			radius := stepRatio * maxRadius * (0.8 + peak*0.3)
+			// Start from minimum radius to avoid center density
+			minRadius := maxRadius * 0.15
+			radius := minRadius + stepRatio*(maxRadius-minRadius)*(0.9+peak*0.4)
 
 			// PROCEDURAL ORGANIC CURVATURE - not geometric
 			// Use multiple noise-like functions for natural flow
@@ -189,11 +191,12 @@ func drawCounterStreams(screen tcell.Screen, centerX, centerY int, maxRadius, ph
 		// Stream characteristics
 		streamAmplitude := peak * (0.15 + float64(streamIndex)*0.02) * scale
 
-		// Create organic stream path
-		streamLength := int(maxRadius * 0.8)
+		// Create organic stream path - expand and avoid center
+		streamLength := int(maxRadius * 1.2)
 		stepSize := 2.5 + float64(depthLayer)*0.3
+		minStartPos := maxRadius * 0.12
 
-		for pos := 3.0; pos < float64(streamLength); pos += stepSize {
+		for pos := minStartPos; pos < float64(streamLength); pos += stepSize {
 			posRatio := pos / float64(streamLength)
 
 			// Organic stream curvature - not spiral
@@ -203,9 +206,9 @@ func drawCounterStreams(screen tcell.Screen, centerX, centerY int, maxRadius, ph
 			// Current angle with organic deviation
 			currentAngle := startAngle + phase*rotationSpeed + streamCurve*0.08 + organicWiggle*0.05
 
-			// Organic radius with natural pulsing
-			baseRadius := pos * (0.9 + 0.2*math.Sin(phase*1.6+streamPersonality))
-			radiusPulse := 1 + 0.03*math.Sin(phase*2.0+pos*0.04)*scale
+			// Organic radius with natural pulsing - expanded range
+			baseRadius := pos * (1.1 + 0.3*math.Sin(phase*1.6+streamPersonality))
+			radiusPulse := 1 + 0.04*math.Sin(phase*2.0+pos*0.04)*scale
 			finalRadius := baseRadius * radiusPulse
 
 			x := centerX + int(finalRadius*math.Cos(currentAngle))
@@ -278,11 +281,12 @@ func drawGrowthTendrils(screen tcell.Screen, centerX, centerY int, maxRadius, ph
 		tendrilAmplitude := peak * (0.1 + float64(tendrilIndex)*0.02) * scale
 		growthSpeed := 0.08 + float64(tendrilIndex)*0.02
 
-		// Organic growth path
-		maxGrowthSteps := int(maxRadius * 0.6)
+		// Organic growth path - expand and avoid center
+		maxGrowthSteps := int(maxRadius * 0.9)
 		currentAngle := growthAngle
+		minGrowthStart := maxRadius * 0.1
 
-		for growth := 2.0; growth < float64(maxGrowthSteps); growth += 2.8 + float64(depthLayer)*0.2 {
+		for growth := minGrowthStart; growth < float64(maxGrowthSteps); growth += 2.8 + float64(depthLayer)*0.2 {
 			growthRatio := growth / float64(maxGrowthSteps)
 
 			// Organic tendril curvature - like plant growth
@@ -293,11 +297,11 @@ func drawGrowthTendrils(screen tcell.Screen, centerX, centerY int, maxRadius, ph
 			angleChange := (growthCurve + organicTwist) * 0.06
 			currentAngle += angleChange + growthSpeed*goldenAngle*0.2
 
-			// Organic growth radius
-			growthRadius := growth * (1 + 0.1*math.Sin(phase*1.8+tendrilPersonality))
+			// Organic growth radius - expanded range
+			growthRadius := growth * (1.2 + 0.15*math.Sin(phase*1.8+tendrilPersonality))
 
 			// Organic breathing
-			breathe := 1 + 0.02*math.Sin(phase*2.3+growth*0.05)*scale
+			breathe := 1 + 0.03*math.Sin(phase*2.3+growth*0.05)*scale
 			finalRadius := growthRadius * breathe
 
 			x := centerX + int(finalRadius*math.Cos(currentAngle))
