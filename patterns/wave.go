@@ -64,7 +64,7 @@ var (
 func DrawWave(screen tcell.Screen, width, height int, color tcell.Color, char rune, rng *rand.Rand, peak float64) {
 	now := time.Now()
 	elapsed := now.Sub(waveLastUpdate).Seconds()
-	if elapsed < 1.0/120.0 { // 120 FPS limit
+	if elapsed < 1.0/520.0 { // 520 FPS limit
 		return
 	}
 	waveLastUpdate = now

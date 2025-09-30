@@ -167,12 +167,6 @@ func showHelp() {
 	fmt.Println("  go run . test-monitor    # Test monitor source configuration")
 	fmt.Println("  go run . help            # Show this help")
 	fmt.Println()
-	fmt.Println("Controls (when running):")
-	fmt.Println("  R         Restart audio capture")
-	fmt.Println("  +/-       Adjust sensitivity")
-	fmt.Println("  D         Show available devices")
-	fmt.Println("  Ctrl+C    Quit")
-	fmt.Println()
 	fmt.Println("For system audio capture on Linux:")
 	fmt.Println("  Run: go run . setup-audio")
 }
@@ -233,7 +227,7 @@ func AudioPlayerMain() {
 		tview.Print(screen, infoTextNowPlaying.GetText(true), x, y, width, tview.AlignCenter, tcell.ColorWhite)
 		tview.Print(screen, infoTextVolume.GetText(true), x, y+1, width, tview.AlignCenter, tcell.ColorWhite)
 
-		statusText := "R (Restart), +/- (Sensitivity), D (Device), P (Patterns), X (Shuffle), Ctrl+C (Quit)"
+		statusText := "+/- (Sensitivity), D (Device), P (Patterns), X (Shuffle), Ctrl+C (Quit)"
 		tview.Print(screen, statusText, x, height-1, width, tview.AlignCenter, tcell.ColorGreenYellow)
 
 		return x, y, width, height
