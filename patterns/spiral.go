@@ -117,10 +117,27 @@ func drawOrganicFlows(screen tcell.Screen, centerX, centerY int, maxRadius, phas
 			y := centerY + int(finalRadius*math.Sin(finalAngle)+microY)
 
 			if x >= 0 && x < width && y >= 0 && y < height {
+				// Calculate flow intensity for intelligent character fading
+				flowIntensity := math.Abs(organicCurvature) * (1.0 - stepRatio*0.4) * scale * peak
+
 				// Organic character selection
 				charPhase := flowPersonality + radius*0.08 + organicCurvature*0.4
 				charIndex := int(math.Abs(charPhase)) % len(chars)
-				displayChar := chars[charIndex]
+				baseDisplayChar := chars[charIndex]
+
+				// Intelligent character fading based on intensity
+				var displayChar rune
+				if flowIntensity < 0.1 {
+					displayChar = '·' // Barely visible dot
+				} else if flowIntensity < 0.2 {
+					displayChar = '˙' // Small dot
+				} else if flowIntensity < 0.35 {
+					displayChar = '∘' // Circle outline
+				} else if flowIntensity < 0.5 {
+					displayChar = '◦' // Larger circle
+				} else {
+					displayChar = baseDisplayChar // Full character set
+				}
 
 				// Organic color
 				hue := math.Mod(flowPersonality*0.4+phase*0.06+organicCurvature*0.02, 1)
@@ -132,8 +149,8 @@ func drawOrganicFlows(screen tcell.Screen, centerX, centerY int, maxRadius, phas
 
 				flowColor := HSVToRGB(hue, saturation, value)
 
-				// Organic transparency
-				if stepRatio > 0.7 || math.Abs(organicCurvature) < flowAmplitude*0.3 {
+				// Additional fading for very weak areas
+				if stepRatio > 0.8 || flowIntensity < 0.08 {
 					displayChar = '·'
 				}
 
@@ -195,10 +212,27 @@ func drawCounterStreams(screen tcell.Screen, centerX, centerY int, maxRadius, ph
 			y := centerY + int(finalRadius*math.Sin(currentAngle))
 
 			if x >= 0 && x < width && y >= 0 && y < height {
+				// Calculate stream intensity for intelligent character fading
+				streamIntensity := math.Abs(streamCurve) * (1.0 - posRatio*0.3) * scale * peak
+
 				// Character selection
 				charPhase := streamPersonality + pos*0.07 + streamCurve*0.3
 				charIndex := int(math.Abs(charPhase)) % len(chars)
-				streamChar := chars[charIndex]
+				baseStreamChar := chars[charIndex]
+
+				// Intelligent character fading based on intensity
+				var streamChar rune
+				if streamIntensity < 0.08 {
+					streamChar = '·' // Barely visible dot
+				} else if streamIntensity < 0.18 {
+					streamChar = '˙' // Small dot
+				} else if streamIntensity < 0.3 {
+					streamChar = '∘' // Circle outline
+				} else if streamIntensity < 0.45 {
+					streamChar = '◦' // Larger circle
+				} else {
+					streamChar = baseStreamChar // Full character set
+				}
 
 				// Organic color
 				hue := math.Mod(streamPersonality*0.3+phase*0.05+streamCurve*0.02, 1)
@@ -270,10 +304,27 @@ func drawGrowthTendrils(screen tcell.Screen, centerX, centerY int, maxRadius, ph
 			y := centerY + int(finalRadius*math.Sin(currentAngle))
 
 			if x >= 0 && x < width && y >= 0 && y < height {
+				// Calculate tendril intensity for intelligent character fading
+				tendrilIntensity := math.Abs(growthCurve) * (1.0 - growthRatio*0.5) * scale * peak
+
 				// Character selection
 				charPhase := tendrilPersonality + growth*0.06 + growthCurve*0.2
 				charIndex := int(math.Abs(charPhase)) % len(chars)
-				tendrilChar := chars[charIndex]
+				baseTendrilChar := chars[charIndex]
+
+				// Intelligent character fading based on intensity
+				var tendrilChar rune
+				if tendrilIntensity < 0.06 {
+					tendrilChar = '·' // Barely visible dot
+				} else if tendrilIntensity < 0.15 {
+					tendrilChar = '˙' // Small dot
+				} else if tendrilIntensity < 0.25 {
+					tendrilChar = '∘' // Circle outline
+				} else if tendrilIntensity < 0.4 {
+					tendrilChar = '◦' // Larger circle
+				} else {
+					tendrilChar = baseTendrilChar // Full character set
+				}
 
 				// Very subtle organic color
 				hue := math.Mod(tendrilPersonality*0.2+phase*0.04, 1)
@@ -285,8 +336,8 @@ func drawGrowthTendrils(screen tcell.Screen, centerX, centerY int, maxRadius, ph
 
 				tendrilColor := HSVToRGB(hue, saturation, value)
 
-				// Growth-based transparency
-				if growthRatio > 0.85 || math.Abs(growthCurve) < tendrilAmplitude*0.5 {
+				// Additional fading for very weak areas
+				if growthRatio > 0.9 || tendrilIntensity < 0.05 {
 					tendrilChar = '·'
 				}
 
@@ -336,11 +387,25 @@ func drawTendrilBranch(screen tcell.Screen, x, y int, baseAngle float64, color t
 
 		if branchX >= 0 && branchX < width && branchY >= 0 && branchY < height {
 			charIndex := step % len(branchChars)
-			branchChar := branchChars[charIndex]
+			baseBranchChar := branchChars[charIndex]
 
-			// Gentle fade
-			intensity := (1.0 - stepRatio*0.7) * goldenRatio * 0.3 * scale
-			if intensity > 0.4 {
+			// Calculate branch intensity for intelligent character fading
+			branchIntensity := (1.0 - stepRatio*0.6) * amplitude * scale * goldenRatio * 0.4
+
+			// Intelligent character fading for branches
+			var branchChar rune
+			if branchIntensity < 0.1 {
+				branchChar = '·'
+			} else if branchIntensity < 0.2 {
+				branchChar = '˙'
+			} else if branchIntensity < 0.3 {
+				branchChar = '∘'
+			} else {
+				branchChar = baseBranchChar
+			}
+
+			// Only render if branch intensity is above threshold
+			if branchIntensity > 0.08 {
 				screen.SetContent(branchX, branchY, branchChar, nil, tcell.StyleDefault.Foreground(color))
 			}
 		}

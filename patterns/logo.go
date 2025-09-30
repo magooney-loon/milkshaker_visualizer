@@ -115,12 +115,18 @@ func DrawLogo(screen tcell.Screen, width, height int, color tcell.Color, char ru
 
 			logoColor := HSVToRGB(finalHue, saturation, value)
 
-			// Use original character or fade to dot based on intensity
-			displayChar := rune(char)
-			if finalIntensity < 0.3 {
-				displayChar = '·'
+			// Intelligent character fading based on intensity - 5 levels for consistency
+			var displayChar rune
+			if finalIntensity < 0.1 {
+				displayChar = '·' // Barely visible dot
+			} else if finalIntensity < 0.2 {
+				displayChar = '˙' // Small dot
+			} else if finalIntensity < 0.35 {
+				displayChar = '∘' // Circle outline
 			} else if finalIntensity < 0.5 {
-				displayChar = '∘'
+				displayChar = '◦' // Larger circle
+			} else {
+				displayChar = rune(char) // Original logo character
 			}
 
 			screen.SetContent(finalX, finalY, displayChar, nil, tcell.StyleDefault.Foreground(logoColor))

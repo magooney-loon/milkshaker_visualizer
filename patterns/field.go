@@ -77,10 +77,27 @@ func DrawField(screen tcell.Screen, width, height int, color tcell.Color, char r
 					// Bounds check
 					if finalX >= 0 && finalX < width && finalY >= 0 && finalY < height {
 
+						// Calculate field intensity for intelligent character fading
+						fieldIntensity := math.Abs(finalStrength) * centerInfluence * (1 - layerDepth*0.4)
+
 						// Organic character selection based on field properties
 						charPhase := finalStrength*5 + goldenPhase + float64(depthLayer)*2.1
 						charIndex := int(math.Abs(charPhase)*goldenRatio) % len(fieldChars)
-						fieldChar := fieldChars[charIndex]
+						baseFieldChar := fieldChars[charIndex]
+
+						// Intelligent character fading based on intensity
+						var fieldChar rune
+						if fieldIntensity < 0.15 {
+							fieldChar = '·' // Barely visible dot
+						} else if fieldIntensity < 0.3 {
+							fieldChar = '˙' // Small dot
+						} else if fieldIntensity < 0.5 {
+							fieldChar = '∘' // Circle outline
+						} else if fieldIntensity < 0.7 {
+							fieldChar = '◦' // Larger circle
+						} else {
+							fieldChar = baseFieldChar // Full character set
+						}
 
 						// Very subtle colors that create depth
 						hue := math.Mod(goldenPhase*0.1+layerPhase*0.05, 1)
@@ -95,8 +112,8 @@ func DrawField(screen tcell.Screen, width, height int, color tcell.Color, char r
 
 						fieldColor := HSVToRGB(hue, saturation, value)
 
-						// Extra subtle for background layers
-						if layerDepth > 0.5 && math.Abs(finalStrength) < 0.3 {
+						// Extra subtle for background layers - override with even more subtle characters
+						if layerDepth > 0.5 && fieldIntensity < 0.25 {
 							fieldChar = '·'
 						}
 
@@ -142,11 +159,23 @@ func drawFieldTendril(screen tcell.Screen, x, y int, strength, phase float64, co
 
 		if tendrilX >= 0 && tendrilX < width && tendrilY >= 0 && tendrilY < height {
 			charIndex := step % len(tendrilChars)
-			tendrilChar := tendrilChars[charIndex]
+			baseTendrilChar := tendrilChars[charIndex]
 
-			// Fade along tendril
-			intensity := 1.0 - stepPhase
-			if intensity > 0.5 {
+			// Calculate tendril intensity for smooth fading
+			stepIntensity := (1.0 - stepPhase) * math.Abs(strength) * 0.8
+
+			// Intelligent character fading for tendrils
+			var tendrilChar rune
+			if stepIntensity < 0.2 {
+				tendrilChar = '·'
+			} else if stepIntensity < 0.4 {
+				tendrilChar = '˙'
+			} else {
+				tendrilChar = baseTendrilChar
+			}
+
+			// Only render if intensity is above minimum threshold
+			if stepIntensity > 0.15 {
 				screen.SetContent(tendrilX, tendrilY, tendrilChar, nil, tcell.StyleDefault.Foreground(color))
 			}
 		}
@@ -185,7 +214,23 @@ func drawFieldFlows(screen tcell.Screen, centerX, centerY, width, height int, ph
 
 			if flowX >= 0 && flowX < width && flowY >= 0 && flowY < height {
 				charIndex := (int(radius) + flow) % len(flowChars)
-				flowChar := flowChars[charIndex]
+				baseFlowChar := flowChars[charIndex]
+
+				// Calculate flow intensity for intelligent fading
+				distanceRatio := (radius - startRadius) / (maxFlowRadius - startRadius)
+				flowIntensity := (1.0 - distanceRatio) * peak * (1.0 - depth*0.3)
+
+				// Intelligent character fading for flows
+				var flowChar rune
+				if flowIntensity < 0.1 {
+					flowChar = '·'
+				} else if flowIntensity < 0.25 {
+					flowChar = '˙'
+				} else if flowIntensity < 0.4 {
+					flowChar = '∘'
+				} else {
+					flowChar = baseFlowChar
+				}
 
 				// Very subtle flow colors
 				hue := math.Mod(float64(flow)/float64(numFlows)*goldenRatio+phase*0.1, 1)
@@ -195,9 +240,8 @@ func drawFieldFlows(screen tcell.Screen, centerX, centerY, width, height int, ph
 
 				flowColor := HSVToRGB(hue, saturation, value)
 
-				// Distance fade
-				distanceRatio := (radius - startRadius) / (maxFlowRadius - startRadius)
-				if distanceRatio < 0.8 {
+				// Only render if flow intensity is above threshold
+				if flowIntensity > 0.08 && distanceRatio < 0.8 {
 					screen.SetContent(flowX, flowY, flowChar, nil, tcell.StyleDefault.Foreground(flowColor))
 				}
 			}

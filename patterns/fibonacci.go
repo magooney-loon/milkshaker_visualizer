@@ -130,13 +130,33 @@ func (v *FibonacciVisualizer) Draw(screen tcell.Screen) {
 				segmentX := float64(centerX) + interpolatedRadius*math.Cos(interpolatedAngle)*breathe
 				segmentY := float64(centerY) + interpolatedRadius*math.Sin(interpolatedAngle)*breathe
 
+				// Calculate fibonacci intensity for intelligent character fading
+				fibonacciIntensity := amplitude * (1.0 - segmentRatio*0.6) * (1.0 - float64(layer)*0.2)
+				fibonacciIntensity = math.Max(0.0, fibonacciIntensity)
+
 				// Dynamic character selection based on organic factors
 				charPhase := float64(i*segment+layer) + organicOffset*2
 				if math.IsNaN(charPhase) || math.IsInf(charPhase, 0) {
 					charPhase = 0
 				}
 				charIndex := int(math.Abs(charPhase)) % len(chars)
-				displayChar := chars[charIndex]
+				baseDisplayChar := chars[charIndex]
+
+				// Intelligent character fading based on intensity
+				var displayChar rune
+				if fibonacciIntensity < 0.1 {
+					displayChar = '·' // Barely visible dot
+				} else if fibonacciIntensity < 0.2 {
+					displayChar = '˙' // Small dot
+				} else if fibonacciIntensity < 0.35 {
+					displayChar = '∘' // Circle outline
+				} else if fibonacciIntensity < 0.5 {
+					displayChar = '◦' // Larger circle
+				} else if fibonacciIntensity < 0.7 {
+					displayChar = '○' // Filled circle
+				} else {
+					displayChar = baseDisplayChar // Full character set
+				}
 
 				// Subtle, organic color generation
 				colorKey := i*100 + layer*10 + segment
@@ -146,13 +166,9 @@ func (v *FibonacciVisualizer) Draw(screen tcell.Screen) {
 					v.colorCache[colorKey] = color
 				}
 
-				// Add organic transparency effect
-				if segmentRatio > 0.8 || amplitude < 0.1 {
-					// Fade out at edges and low amplitude
-					intensity := math.Max(0.3, 1-segmentRatio*1.5) * math.Max(0.3, amplitude*2)
-					if intensity < 0.5 {
-						displayChar = '·'
-					}
+				// Additional edge fading for very weak areas
+				if segmentRatio > 0.85 || amplitude < 0.08 {
+					displayChar = '·'
 				}
 
 				// Safety check for screen coordinates
@@ -215,11 +231,25 @@ func (v *FibonacciVisualizer) drawOrganicBranch(screen tcell.Screen, x, y int, b
 			// Safety check for branch coordinates
 			if branchX >= 0 && branchX < width && branchY >= 0 && branchY < height {
 				charIndex := (step + branch) % len(branchChars)
-				branchChar := branchChars[charIndex]
+				baseBranchChar := branchChars[charIndex]
 
-				// Fade branch color
-				intensity := 1.0 - float64(step)/float64(branchLength*2)
-				if intensity > 0.3 {
+				// Calculate branch intensity for intelligent fading
+				branchIntensity := (1.0 - float64(step)/float64(branchLength)/1.5) * amplitude * (1.0 - float64(layer)*0.1)
+
+				// Intelligent character fading for branches
+				var branchChar rune
+				if branchIntensity < 0.2 {
+					branchChar = '·'
+				} else if branchIntensity < 0.4 {
+					branchChar = '˙'
+				} else if branchIntensity < 0.6 {
+					branchChar = '∘'
+				} else {
+					branchChar = baseBranchChar
+				}
+
+				// Only render if branch intensity is above threshold
+				if branchIntensity > 0.15 {
 					screen.SetContent(branchX, branchY, branchChar, nil, tcell.StyleDefault.Foreground(color))
 				}
 			}

@@ -149,13 +149,33 @@ func DrawStarburst(screen tcell.Screen, width, height int, color tcell.Color, ch
 					// Bounds check
 					if x >= 0 && x < width && y >= 0 && y < height {
 						// 3D character selection based on depth and flow
+						// Calculate starburst intensity for intelligent character fading
+						starburstIntensity := peak * (1.0 - currentRadius/depthMaxRadius*0.7) * perspectiveScale * (0.4 + math.Abs(totalCurvature)*0.6)
+
+						// Character selection
 						charPhase := rayPersonality + currentRadius*0.12 + totalCurvature*0.3 +
 							float64(beam)*1.8 + float64(depthLayer)*2.5
 						if math.IsNaN(charPhase) || math.IsInf(charPhase, 0) {
 							charPhase = 0
 						}
 						charIndex := int(math.Abs(charPhase)*goldenRatio) % len(chars)
-						rayChar := chars[charIndex]
+						baseRayChar := chars[charIndex]
+
+						// Intelligent character fading based on intensity
+						var rayChar rune
+						if starburstIntensity < 0.1 {
+							rayChar = '·' // Barely visible dot
+						} else if starburstIntensity < 0.2 {
+							rayChar = '˙' // Small dot
+						} else if starburstIntensity < 0.35 {
+							rayChar = '∘' // Circle outline
+						} else if starburstIntensity < 0.5 {
+							rayChar = '◦' // Larger circle
+						} else if starburstIntensity < 0.7 {
+							rayChar = '●' // Filled circle
+						} else {
+							rayChar = baseRayChar // Full character set
+						}
 
 						// 3D color with depth-based hues and perspective
 						colorPhase := rayPersonality*0.3 + currentRadius*0.006 + beamPhase*0.1 +
@@ -176,17 +196,11 @@ func DrawStarburst(screen tcell.Screen, width, height int, color tcell.Color, ch
 
 						rayColor := HSVToRGB(hue, saturation, value)
 
-						// 3D transparency with depth and flow-based fading
+						// Additional fading for very weak areas and depth transparency
 						distanceRatio := currentRadius / depthMaxRadius
-						flowIntensity := 1.0 + math.Abs(totalCurvature)*0.5
-						depthTransparency := 0.3 + depthRatio*0.7 // Back layers more transparent
 
-						if distanceRatio > 0.7 || peak < 0.2 || flowIntensity < 0.8 {
-							intensity := math.Max(0.1, flowIntensity-distanceRatio*1.1) *
-								math.Max(0.1, peak*2.5) * depthTransparency
-							if intensity < 0.6 {
-								rayChar = '·'
-							}
+						if distanceRatio > 0.8 || peak < 0.15 || starburstIntensity < 0.08 {
+							rayChar = '·'
 						}
 
 						screen.SetContent(x, y, rayChar, nil, tcell.StyleDefault.Foreground(rayColor))
@@ -266,15 +280,28 @@ func draw3DOrganicStarburstBranch(screen tcell.Screen, x, y int, baseAngle, curv
 
 			if branchX >= 0 && branchX < width && branchY >= 0 && branchY < height {
 				charIndex := (step + branch + rayIndex + depthLayer) % len(branchChars)
-				branchChar := branchChars[charIndex]
+				baseBranchChar := branchChars[charIndex]
 
-				// 3D organic fade with flow influence and depth attenuation
+				// Calculate branch intensity for intelligent character fading
 				flowIntensity := 1.0 + math.Abs(branchCurve)*0.5
 				depthAttenuation := 0.4 + float64(depthLayer)/6.0*0.6 // Back layers dimmer
-				intensity := (1.0 - stepRatio*0.8) * flowIntensity * goldenRatio * 0.5 *
-					perspectiveScale * depthAttenuation
+				branchIntensity := (1.0 - stepRatio*0.7) * flowIntensity * goldenRatio * 0.4 *
+					perspectiveScale * depthAttenuation * amplitude
 
-				if intensity > 0.2 {
+				// Intelligent character fading for branches
+				var branchChar rune
+				if branchIntensity < 0.1 {
+					branchChar = '·'
+				} else if branchIntensity < 0.2 {
+					branchChar = '˙'
+				} else if branchIntensity < 0.35 {
+					branchChar = '∘'
+				} else {
+					branchChar = baseBranchChar
+				}
+
+				// Only render if branch intensity is above threshold
+				if branchIntensity > 0.08 {
 					screen.SetContent(branchX, branchY, branchChar, nil, tcell.StyleDefault.Foreground(color))
 				}
 			}
