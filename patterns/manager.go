@@ -2,6 +2,7 @@ package patterns
 
 import (
 	"math/rand"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 )
@@ -15,72 +16,51 @@ type Visualizator struct {
 
 // Manager handles visualizator selection and pattern drawing
 type Manager struct {
-	visualizators  []Visualizator
-	currentIndex   int
-	shuffleEnabled bool
-	rng            *rand.Rand
+	visualizators   []Visualizator
+	currentIndex    int
+	shuffleEnabled  bool
+	rng             *rand.Rand
+	lastShuffleTime time.Time
+	shuffleDuration time.Duration
 }
 
 // NewManager creates a new pattern manager with predefined visualizators
 func NewManager() *Manager {
 	visualizators := []Visualizator{
 		{
-			Name:     "Mathy",
-			Patterns: []PatternFunc{DrawStarburst, DrawFibonacci},
-			Enabled:  []bool{true, true},
-		},
-		{
-			Name:     "Flow State",
-			Patterns: []PatternFunc{DrawWave, DrawFibonacci},
-			Enabled:  []bool{true, true},
-		},
-		{
-			Name:     "Cosmic",
-			Patterns: []PatternFunc{DrawStarburst, DrawLogo, DrawWave},
-			Enabled:  []bool{true, true, false},
-		},
-		{
-			Name:     "Ocean Vibes",
-			Patterns: []PatternFunc{DrawWave, DrawLogo},
-			Enabled:  []bool{true, true},
-		},
-		{
-			Name:     "Fibonacci Focus",
-			Patterns: []PatternFunc{DrawFibonacci},
-			Enabled:  []bool{true},
-		},
-		{
-			Name:     "Starburst Solo",
+			Name:     "Starburst",
 			Patterns: []PatternFunc{DrawStarburst},
 			Enabled:  []bool{true},
 		},
 		{
-			Name:     "Wave Solo",
+			Name:     "Fibonacci",
+			Patterns: []PatternFunc{DrawFibonacci},
+			Enabled:  []bool{true},
+		},
+		{
+			Name:     "Wave",
 			Patterns: []PatternFunc{DrawWave},
 			Enabled:  []bool{true},
 		},
 		{
-			Name:     "Logo Brand",
+			Name:     "Logo",
 			Patterns: []PatternFunc{DrawLogo},
 			Enabled:  []bool{true},
 		},
 		{
-			Name:     "Triple Threat",
-			Patterns: []PatternFunc{DrawStarburst, DrawWave, DrawFibonacci},
-			Enabled:  []bool{true, false, true},
-		},
-		{
-			Name:     "All Patterns",
-			Patterns: []PatternFunc{DrawStarburst, DrawFibonacci, DrawLogo, DrawWave},
+			Name:     "MixMax",
+			Patterns: []PatternFunc{DrawStarburst, DrawFibonacci, DrawWave, DrawLogo},
 			Enabled:  []bool{true, true, true, true},
 		},
 	}
 
 	return &Manager{
-		visualizators:  visualizators,
-		currentIndex:   0,
-		shuffleEnabled: false,
-		rng:            rand.New(rand.NewSource(42)),
+		visualizators:   visualizators,
+		currentIndex:    0,
+		shuffleEnabled:  false,
+		rng:             rand.New(rand.NewSource(42)),
+		lastShuffleTime: time.Now(),
+		shuffleDuration: 27 * time.Second,
 	}
 }
 
@@ -102,6 +82,9 @@ func (m *Manager) CycleVisualizator() {
 // ToggleShuffle toggles shuffle mode on/off
 func (m *Manager) ToggleShuffle() {
 	m.shuffleEnabled = !m.shuffleEnabled
+	if m.shuffleEnabled {
+		m.lastShuffleTime = time.Now() // Reset timer when enabling shuffle
+	}
 }
 
 // IsShuffleEnabled returns whether shuffle is currently enabled
@@ -164,9 +147,12 @@ func (m *Manager) DrawCurrentVisualizator(screen tcell.Screen, color tcell.Color
 	char := RandomRune(rng)
 	current := m.visualizators[m.currentIndex]
 
-	// Auto-shuffle if enabled and high amplitude
-	if m.shuffleEnabled && amplitude > 0.8 && rng.Float64() < 0.02 { // 2% chance per frame at high amplitude
-		m.ShuffleCurrentVisualizator()
+	// Auto-shuffle: cycle visualizators every 27 seconds when shuffle is enabled
+	if m.shuffleEnabled {
+		if time.Since(m.lastShuffleTime) >= m.shuffleDuration {
+			m.CycleVisualizator()
+			m.lastShuffleTime = time.Now()
+		}
 	}
 
 	// Draw all enabled patterns

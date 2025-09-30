@@ -259,13 +259,8 @@ func AudioPlayerMain() {
 			// Cycle to next visualizator
 			patternManager.CycleVisualizator()
 		case 'x', 'X':
-			// Toggle shuffle or shuffle current visualizator
-			if patternManager.IsShuffleEnabled() {
-				patternManager.ToggleShuffle() // Turn off shuffle
-			} else {
-				patternManager.ToggleShuffle()              // Turn on shuffle
-				patternManager.ShuffleCurrentVisualizator() // Do immediate shuffle
-			}
+			// Toggle shuffle mode (cycles visualizators every 27 seconds)
+			patternManager.ToggleShuffle()
 		}
 
 		// Handle Ctrl+C for quit
