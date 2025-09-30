@@ -86,7 +86,7 @@ var (
 func DrawStarburst(screen tcell.Screen, width, height int, color tcell.Color, char rune, rng *rand.Rand, peak float64) {
 	now := time.Now()
 	elapsed := now.Sub(starburstLastUpdate).Seconds()
-	if elapsed < 1.0/60.0 { // 60 FPS limit
+	if elapsed < 1.0/240.0 { // 240 FPS limit
 		return
 	}
 	starburstLastUpdate = now

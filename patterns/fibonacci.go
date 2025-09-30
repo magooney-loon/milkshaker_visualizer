@@ -84,7 +84,7 @@ var (
 func DrawFibonacci(screen tcell.Screen, width, height int, color tcell.Color, char rune, rng *rand.Rand, peak float64) {
 	now := time.Now()
 	elapsed := now.Sub(fibLastUpdate).Seconds()
-	if elapsed < 1.0/60.0 { // 60 FPS limit
+	if elapsed < 1.0/180.0 { // 180 FPS limit
 		return
 	}
 	fibLastUpdate = now
