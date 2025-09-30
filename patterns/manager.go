@@ -28,6 +28,11 @@ type Manager struct {
 func NewManager() *Manager {
 	visualizators := []Visualizator{
 		{
+			Name:     "Milkshaker",
+			Patterns: []PatternFunc{DrawLogo},
+			Enabled:  []bool{true},
+		},
+		{
 			Name:     "Starburst",
 			Patterns: []PatternFunc{DrawStarburst},
 			Enabled:  []bool{true},
@@ -40,11 +45,6 @@ func NewManager() *Manager {
 		{
 			Name:     "Wave",
 			Patterns: []PatternFunc{DrawWave},
-			Enabled:  []bool{true},
-		},
-		{
-			Name:     "Logo",
-			Patterns: []PatternFunc{DrawLogo},
 			Enabled:  []bool{true},
 		},
 		{
