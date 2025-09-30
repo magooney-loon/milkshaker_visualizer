@@ -1,0 +1,7 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Name=Milkshaker Visualizer
+Exec=/your/path/to/Git/milkshaker_visualizer/milkshaker
+Icon=/your/path/to/Git/milkshaker_visualizer/assets/icon.png
+Terminal=true
+Type=Application
