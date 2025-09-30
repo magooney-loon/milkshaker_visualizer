@@ -56,19 +56,19 @@ type Spiral struct {
 var (
 	// Particle systems
 	starburstParticles []StarburstParticle
-	maxStarParticles   = 200
+	maxStarParticles   = 180
 
 	// Lightning system
 	lightningBolts []Lightning
-	maxLightning   = 15
+	maxLightning   = 12
 
 	// Shockwave system
 	shockwaves    []Shockwave
-	maxShockwaves = 8
+	maxShockwaves = 7
 
 	// Spiral system
 	spirals    []Spiral
-	maxSpirals = 12
+	maxSpirals = 9
 
 	// Animation phases
 	explosionPhase float64 = 0.0

@@ -40,11 +40,11 @@ type FlowField struct {
 var (
 	// Minimalist particle system
 	waveParticles    []WaveParticle
-	maxWaveParticles = 80 // Fewer particles for minimalism
+	maxWaveParticles = 10 // Much fewer particles for clean wireframe
 
 	// Gentle ripple system
 	ripples    []Ripple
-	maxRipples = 12
+	maxRipples = 4
 
 	// Flow field for organic movement
 	flowField []FlowField
@@ -57,14 +57,14 @@ var (
 
 	// Peak tracking
 	wavePeakHistory []float64
-	maxWaveHistory  = 15
+	maxWaveHistory  = 9
 )
 
 // DrawWave creates a minimalistic yet epic flowing liquid wave experience
 func DrawWave(screen tcell.Screen, width, height int, color tcell.Color, char rune, rng *rand.Rand, peak float64) {
 	now := time.Now()
 	elapsed := now.Sub(waveLastUpdate).Seconds()
-	if elapsed < 1.0/60.0 { // 60 FPS limit
+	if elapsed < 1.0/120.0 { // 120 FPS limit
 		return
 	}
 	waveLastUpdate = now
@@ -109,8 +109,8 @@ func DrawWave(screen tcell.Screen, width, height int, color tcell.Color, char ru
 func drawLiquidWaves(screen tcell.Screen, width, height int, peak, avgPeak float64, rng *rand.Rand) {
 	basePhase := GetBasePhase()
 
-	// Minimal character set for smooth gradients
-	waveChars := []rune{'·', '∘', '○', '●', '◉', '~', '≈', '∽'}
+	// Clean wireframe character set for clear wave lines
+	waveChars := []rune{'·', '-', '─', '━', '═', '~', '≈', '∿'}
 
 	// Fewer, smoother waves (2-4 based on audio)
 	numWaves := 2 + int(avgPeak*2)
@@ -164,26 +164,26 @@ func drawLiquidWaves(screen tcell.Screen, width, height int, peak, avgPeak float
 					// Combine for final intensity
 					totalIntensity := coreIntensity * waveIntensity
 
-					// Add liquid sparkles at wave crests
-					if amplitudeRatio > 0.7 && rng.Float64() < 0.15*peak {
-						totalIntensity += 0.3
+					// Minimal sparkles to keep clean wireframe look
+					if amplitudeRatio > 0.8 && rng.Float64() < 0.05*peak {
+						totalIntensity += 0.2
 					}
 
 					if totalIntensity > 0.1 {
-						// Smooth character progression
+						// Clean wireframe character progression
 						var waveChar rune
 						morphLevel := totalIntensity + peak*0.2
 
 						if morphLevel < 0.2 {
 							waveChar = waveChars[0] // ·
 						} else if morphLevel < 0.35 {
-							waveChar = waveChars[1] // ∘
+							waveChar = waveChars[1] // -
 						} else if morphLevel < 0.5 {
-							waveChar = waveChars[2] // ○
+							waveChar = waveChars[2] // ─
 						} else if morphLevel < 0.65 {
-							waveChar = waveChars[3] // ●
+							waveChar = waveChars[3] // ━
 						} else if morphLevel < 0.8 {
-							waveChar = waveChars[4] // ◉
+							waveChar = waveChars[4] // ═
 						} else if morphLevel < 0.9 {
 							waveChar = waveChars[5] // ~
 						} else {
@@ -260,8 +260,8 @@ func drawVerticalFlow(screen tcell.Screen, x, centerY, height int, flowHeight, p
 }
 
 func updateWaveParticles(elapsed, peak, avgPeak float64, width, height int, rng *rand.Rand) {
-	// Spawn particles very gently for meditative effect
-	spawnRate := avgPeak * 2.5
+	// Minimal particles to reduce visual noise
+	spawnRate := avgPeak * 0.5
 	if len(waveParticles) < maxWaveParticles && rng.Float64() < spawnRate*elapsed {
 		// Spawn from wave areas with depth variation
 		spawnX := rng.Float64() * float64(width)
@@ -324,8 +324,8 @@ func drawWaveParticles(screen tcell.Screen, width, height int) {
 }
 
 func updateRipples(elapsed, peak, avgPeak float64, width, height int, rng *rand.Rand) {
-	// Create very gentle, slow ripples
-	if len(ripples) < maxRipples && rng.Float64() < peak*0.8*elapsed {
+	// Create minimal ripples to keep focus on wave lines
+	if len(ripples) < maxRipples && rng.Float64() < peak*0.3*elapsed {
 		ripple := Ripple{
 			x:         rng.Float64() * float64(width),
 			y:         float64(height/2) + (rng.Float64()-0.5)*float64(height/8),
@@ -437,18 +437,18 @@ func updateFlowField(elapsed, peak float64, width, height int) {
 }
 
 func drawFlowEffects(screen tcell.Screen, width, height int, peak float64) {
-	if peak < 0.3 {
+	if peak < 0.6 {
 		return
 	}
 
-	flowChars := []rune{'·', '˙', '∘', '○'}
+	flowChars := []rune{'·', '˙'}
 
 	for _, field := range flowField {
 		x, y := int(field.x), int(field.y)
 		if x >= 0 && x < width && y >= 0 && y < height {
-			intensity := field.magnitude * field.life * (peak - 0.3) * 2.0
+			intensity := field.magnitude * field.life * (peak - 0.6) * 1.0
 
-			if intensity > 0.2 {
+			if intensity > 0.4 {
 				charIndex := int(intensity * float64(len(flowChars)))
 				if charIndex >= len(flowChars) {
 					charIndex = len(flowChars) - 1
@@ -456,8 +456,8 @@ func drawFlowEffects(screen tcell.Screen, width, height int, peak float64) {
 				char := flowChars[charIndex]
 
 				hue := math.Mod(0.48+field.angle*0.1, 1.0)
-				saturation := 0.2 + intensity*0.3
-				value := intensity * 0.5
+				saturation := 0.1 + intensity*0.2
+				value := intensity * 0.3
 
 				color := HSVToRGB(hue, saturation, value)
 				screen.SetContent(x, y, char, nil, tcell.StyleDefault.Foreground(color))
