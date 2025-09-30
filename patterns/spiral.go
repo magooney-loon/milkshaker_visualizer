@@ -59,10 +59,10 @@ func drawOrganicFlows(screen tcell.Screen, centerX, centerY int, maxRadius, phas
 	goldenRatio := (1 + math.Sqrt(5)) / 2
 	goldenAngle := math.Pi * (3 - math.Sqrt(5))
 
-	// Number of organic flow streams
-	numFlows := 2 + int(peak*2)
-	if numFlows > 4 {
-		numFlows = 4
+	// Number of organic flow streams - slightly more prominent
+	numFlows := 3 + int(peak*2)
+	if numFlows > 5 {
+		numFlows = 5
 	}
 
 	for flowIndex := 0; flowIndex < numFlows; flowIndex++ {
@@ -125,32 +125,32 @@ func drawOrganicFlows(screen tcell.Screen, centerX, centerY int, maxRadius, phas
 				charIndex := int(math.Abs(charPhase)) % len(chars)
 				baseDisplayChar := chars[charIndex]
 
-				// Intelligent character fading based on intensity
+				// Intelligent character fading based on intensity - more visible
 				var displayChar rune
-				if flowIntensity < 0.1 {
+				if flowIntensity < 0.08 {
 					displayChar = '·' // Barely visible dot
-				} else if flowIntensity < 0.2 {
+				} else if flowIntensity < 0.18 {
 					displayChar = '˙' // Small dot
-				} else if flowIntensity < 0.35 {
+				} else if flowIntensity < 0.3 {
 					displayChar = '∘' // Circle outline
-				} else if flowIntensity < 0.5 {
+				} else if flowIntensity < 0.45 {
 					displayChar = '◦' // Larger circle
 				} else {
 					displayChar = baseDisplayChar // Full character set
 				}
 
-				// Organic color
+				// Organic color - enhanced
 				hue := math.Mod(flowPersonality*0.4+phase*0.06+organicCurvature*0.02, 1)
-				saturation := (0.25 + peak*0.15) * (0.4 + stepRatio*0.4) * scale
-				saturation = math.Max(0.05, math.Min(0.5, saturation))
+				saturation := (0.3 + peak*0.18) * (0.45 + stepRatio*0.4) * scale
+				saturation = math.Max(0.08, math.Min(0.6, saturation))
 
-				value := (0.3 + peak*0.15) * (0.3 + stepRatio*0.5) * scale
-				value = math.Max(0.1, math.Min(0.6, value))
+				value := (0.35 + peak*0.18) * (0.35 + stepRatio*0.5) * scale
+				value = math.Max(0.15, math.Min(0.7, value))
 
 				flowColor := HSVToRGB(hue, saturation, value)
 
-				// Additional fading for very weak areas
-				if stepRatio > 0.8 || flowIntensity < 0.08 {
+				// Additional fading for very weak areas - less aggressive
+				if stepRatio > 0.85 || flowIntensity < 0.06 {
 					displayChar = '·'
 				}
 
@@ -170,10 +170,10 @@ func drawCounterStreams(screen tcell.Screen, centerX, centerY int, maxRadius, ph
 
 	goldenRatio := (1 + math.Sqrt(5)) / 2
 
-	// Fewer, more subtle counter-streams
-	numStreams := 1 + int(peak*1.5)
-	if numStreams > 3 {
-		numStreams = 3
+	// Counter-streams - slightly more prominent
+	numStreams := 2 + int(peak*1.5)
+	if numStreams > 4 {
+		numStreams = 4
 	}
 
 	for streamIndex := 0; streamIndex < numStreams; streamIndex++ {
@@ -220,27 +220,27 @@ func drawCounterStreams(screen tcell.Screen, centerX, centerY int, maxRadius, ph
 				charIndex := int(math.Abs(charPhase)) % len(chars)
 				baseStreamChar := chars[charIndex]
 
-				// Intelligent character fading based on intensity
+				// Intelligent character fading based on intensity - more visible
 				var streamChar rune
-				if streamIntensity < 0.08 {
+				if streamIntensity < 0.06 {
 					streamChar = '·' // Barely visible dot
-				} else if streamIntensity < 0.18 {
+				} else if streamIntensity < 0.15 {
 					streamChar = '˙' // Small dot
-				} else if streamIntensity < 0.3 {
+				} else if streamIntensity < 0.28 {
 					streamChar = '∘' // Circle outline
-				} else if streamIntensity < 0.45 {
+				} else if streamIntensity < 0.42 {
 					streamChar = '◦' // Larger circle
 				} else {
 					streamChar = baseStreamChar // Full character set
 				}
 
-				// Organic color
+				// Organic color - enhanced
 				hue := math.Mod(streamPersonality*0.3+phase*0.05+streamCurve*0.02, 1)
-				saturation := (0.2 + peak*0.1) * (0.6 + posRatio*0.3) * scale
-				saturation = math.Max(0.03, math.Min(0.4, saturation))
+				saturation := (0.25 + peak*0.12) * (0.65 + posRatio*0.3) * scale
+				saturation = math.Max(0.06, math.Min(0.5, saturation))
 
-				value := (0.25 + peak*0.1) * (0.5 + posRatio*0.4) * scale
-				value = math.Max(0.08, math.Min(0.5, value))
+				value := (0.3 + peak*0.12) * (0.55 + posRatio*0.4) * scale
+				value = math.Max(0.12, math.Min(0.6, value))
 
 				streamColor := HSVToRGB(hue, saturation, value)
 
@@ -262,10 +262,10 @@ func drawGrowthTendrils(screen tcell.Screen, centerX, centerY int, maxRadius, ph
 	goldenRatio := (1 + math.Sqrt(5)) / 2
 	goldenAngle := math.Pi * (3 - math.Sqrt(5))
 
-	// Organic tendrils based on peak
-	numTendrils := 1 + int(peak*2)
-	if numTendrils > 4 {
-		numTendrils = 4
+	// Organic tendrils based on peak - slightly more prominent
+	numTendrils := 2 + int(peak*2)
+	if numTendrils > 5 {
+		numTendrils = 5
 	}
 
 	for tendrilIndex := 0; tendrilIndex < numTendrils; tendrilIndex++ {
@@ -312,32 +312,32 @@ func drawGrowthTendrils(screen tcell.Screen, centerX, centerY int, maxRadius, ph
 				charIndex := int(math.Abs(charPhase)) % len(chars)
 				baseTendrilChar := chars[charIndex]
 
-				// Intelligent character fading based on intensity
+				// Intelligent character fading based on intensity - more visible
 				var tendrilChar rune
-				if tendrilIntensity < 0.06 {
+				if tendrilIntensity < 0.05 {
 					tendrilChar = '·' // Barely visible dot
-				} else if tendrilIntensity < 0.15 {
+				} else if tendrilIntensity < 0.12 {
 					tendrilChar = '˙' // Small dot
-				} else if tendrilIntensity < 0.25 {
+				} else if tendrilIntensity < 0.22 {
 					tendrilChar = '∘' // Circle outline
-				} else if tendrilIntensity < 0.4 {
+				} else if tendrilIntensity < 0.38 {
 					tendrilChar = '◦' // Larger circle
 				} else {
 					tendrilChar = baseTendrilChar // Full character set
 				}
 
-				// Very subtle organic color
+				// Subtle organic color - enhanced
 				hue := math.Mod(tendrilPersonality*0.2+phase*0.04, 1)
-				saturation := (0.15 + peak*0.08) * (0.3 + growthRatio*0.5) * scale
-				saturation = math.Max(0.02, math.Min(0.3, saturation))
+				saturation := (0.18 + peak*0.1) * (0.35 + growthRatio*0.5) * scale
+				saturation = math.Max(0.04, math.Min(0.4, saturation))
 
-				value := (0.2 + peak*0.08) * (0.4 + growthRatio*0.4) * scale
-				value = math.Max(0.06, math.Min(0.4, value))
+				value := (0.25 + peak*0.1) * (0.45 + growthRatio*0.4) * scale
+				value = math.Max(0.1, math.Min(0.5, value))
 
 				tendrilColor := HSVToRGB(hue, saturation, value)
 
-				// Additional fading for very weak areas
-				if growthRatio > 0.9 || tendrilIntensity < 0.05 {
+				// Additional fading for very weak areas - less aggressive
+				if growthRatio > 0.92 || tendrilIntensity < 0.04 {
 					tendrilChar = '·'
 				}
 

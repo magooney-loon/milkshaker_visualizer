@@ -37,12 +37,12 @@ func DrawStarburst(screen tcell.Screen, width, height int, color tcell.Color, ch
 		// Depth-based phase offset for parallax
 		depthPhase := basePhase * (0.8 + depthRatio*0.4)
 
-		// Organic number of rays per depth layer
-		baseRays := 4 + depthLayer
-		dynamicRays := int(peak * (6 + float64(depthLayer)*2))
+		// Organic number of rays per depth layer - slightly more prominent
+		baseRays := 5 + depthLayer
+		dynamicRays := int(peak * (7 + float64(depthLayer)*2))
 		numRays := baseRays + dynamicRays
-		if numRays > 12+depthLayer*2 {
-			numRays = 12 + depthLayer*2
+		if numRays > 14+depthLayer*2 {
+			numRays = 14 + depthLayer*2
 		}
 
 		// 3D character sets based on depth
@@ -161,17 +161,17 @@ func DrawStarburst(screen tcell.Screen, width, height int, color tcell.Color, ch
 						charIndex := int(math.Abs(charPhase)*goldenRatio) % len(chars)
 						baseRayChar := chars[charIndex]
 
-						// Intelligent character fading based on intensity
+						// Intelligent character fading based on intensity - more visible
 						var rayChar rune
-						if starburstIntensity < 0.1 {
+						if starburstIntensity < 0.08 {
 							rayChar = '·' // Barely visible dot
-						} else if starburstIntensity < 0.2 {
+						} else if starburstIntensity < 0.18 {
 							rayChar = '˙' // Small dot
-						} else if starburstIntensity < 0.35 {
+						} else if starburstIntensity < 0.3 {
 							rayChar = '∘' // Circle outline
-						} else if starburstIntensity < 0.5 {
+						} else if starburstIntensity < 0.45 {
 							rayChar = '◦' // Larger circle
-						} else if starburstIntensity < 0.7 {
+						} else if starburstIntensity < 0.65 {
 							rayChar = '●' // Filled circle
 						} else {
 							rayChar = baseRayChar // Full character set
@@ -182,24 +182,24 @@ func DrawStarburst(screen tcell.Screen, width, height int, color tcell.Color, ch
 							totalCurvature*0.02 + float64(depthLayer)*0.15
 						hue := math.Mod(colorPhase, 1)
 
-						// 3D saturation with depth attenuation
-						saturation := (0.4 + peak*0.3 + math.Abs(totalCurvature)*0.1 - currentRadius/(depthMaxRadius*2.5)) *
-							(0.6 + depthRatio*0.5)
-						saturation = math.Max(0.1, math.Min(0.8, saturation))
+						// 3D saturation with depth attenuation - enhanced
+						saturation := (0.5 + peak*0.35 + math.Abs(totalCurvature)*0.12 - currentRadius/(depthMaxRadius*2.8)) *
+							(0.65 + depthRatio*0.45)
+						saturation = math.Max(0.15, math.Min(0.85, saturation))
 
 						// 3D brightness with depth-based dimming
 						baseValue := (0.7 - currentRadius/depthMaxRadius*0.25) * (0.4 + depthRatio*0.6)
 						valueFlow := math.Sin(beamPhase*1.1+currentRadius*0.06) * 0.1 * perspectiveScale
 						depthDimming := 1.0 - (1.0-depthRatio)*0.4 // Back layers dimmer
-						value := (baseValue + peak*0.2 + valueFlow + math.Abs(totalCurvature)*0.05) * depthDimming
-						value = math.Max(0.15, math.Min(0.9, value))
+						value := (baseValue + peak*0.25 + valueFlow + math.Abs(totalCurvature)*0.06) * depthDimming
+						value = math.Max(0.2, math.Min(0.95, value))
 
 						rayColor := HSVToRGB(hue, saturation, value)
 
 						// Additional fading for very weak areas and depth transparency
 						distanceRatio := currentRadius / depthMaxRadius
 
-						if distanceRatio > 0.8 || peak < 0.15 || starburstIntensity < 0.08 {
+						if distanceRatio > 0.85 || peak < 0.12 || starburstIntensity < 0.06 {
 							rayChar = '·'
 						}
 

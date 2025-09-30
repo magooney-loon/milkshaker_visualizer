@@ -202,8 +202,8 @@ func AudioPlayerMain() {
 		SetTextAlign(tview.AlignCenter)
 
 	updateInfo := func() {
-		infoTextNowPlaying.SetText(player.GetCurrentTrack())
-		infoTextVolume.SetText(fmt.Sprintf("Peak: %.0f%% | Sensitivity: %.1fx | Device: %s", player.GetVolumePercentage(), player.GetSensitivity(), player.GetCurrentDeviceName()))
+		// infoTextVolume.SetText(player.GetCurrentTrack())
+		infoTextNowPlaying.SetText(fmt.Sprintf("Peak: %.0f%% | Sensitivity: %.1fx | Device: %s", player.GetVolumePercentage(), player.GetSensitivity(), player.GetCurrentDeviceName()))
 	}
 
 	player.SetUpdateInfoFunc(updateInfo)
@@ -219,7 +219,7 @@ func AudioPlayerMain() {
 
 		tview.Print(screen, infoTextVolume.GetText(true), x, y+1, width, tview.AlignCenter, tcell.ColorWhite)
 
-		tview.Print(screen, "MILKSHAKER VISUALIZER", x, height-2, width, tview.AlignCenter, tcell.ColorGreen)
+		// tview.Print(screen, "MILKSHAKER VISUALIZER", x, height-2, width, tview.AlignCenter, tcell.ColorGreen)
 
 		var statusText string
 		if player.IsCapturing() {
